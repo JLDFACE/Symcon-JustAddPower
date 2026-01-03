@@ -7,9 +7,11 @@
     "JAP Encoder Flexible Mode"
   ],
   "parentRequirements": [
-    "{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}"
+    "{C8792760-65CF-4C53-B5C7-A30FCC84FEFE}"
   ],
   "childRequirements": [],
-  "implemented": [],
+  "implemented": [
+    "{7A1272A4-CBDB-46EF-BFC6-DCF4A53D2FC7}"
+  ],
   "prefix": "JAPMC"
 }
