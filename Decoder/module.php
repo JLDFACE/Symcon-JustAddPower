@@ -48,7 +48,7 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $this->RegisterAttributeString("Initialized", "0");
 
         // Periodisch Source/Profile refreshen (auch wenn Encoder/Registry geändert wurden)
-        $this->RegisterTimer("RefreshTimer", 60000, "JAPMC_RefreshSources(\$id);");
+        $this->RegisterTimer("RefreshTimer", 60000, 'JAPMC_RefreshSources($_IPS["TARGET"]);');
     }
 
     public function ApplyChanges()
