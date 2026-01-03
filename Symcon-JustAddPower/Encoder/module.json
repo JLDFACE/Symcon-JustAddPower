@@ -1,0 +1,11 @@
+{
+  "id": "{4E0C3C4A-0C7E-4A44-9B6B-5E1C6F4A2A20}",
+  "name": "JAP MaxColor Encoder (Flexible)",
+  "type": 3,
+  "vendor": "Just Add Power",
+  "aliases": ["JAP Encoder Flexible Mode"],
+  "parentRequirements": ["{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}"],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "JAPMC"
+}

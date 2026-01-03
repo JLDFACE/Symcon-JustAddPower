@@ -1,0 +1,11 @@
+{
+  "id": "{2C7A1B0D-6E1C-4F2B-9A5E-3B0D2C7A1B30}",
+  "name": "JAP MaxColor Configurator",
+  "type": 4,
+  "vendor": "Just Add Power",
+  "aliases": ["JAP Device Search"],
+  "parentRequirements": [],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "JAPMC"
+}

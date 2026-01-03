@@ -1,0 +1,30 @@
+# Just Add Power MaxColor (Flexible Mode) – IP-Symcon
+
+## Betriebsmodus
+Dieses Modul-Set ist für **Flexible Mode (advanced)** gedacht, d. h. Video/Audio/USB werden getrennt geschaltet.
+Die Umschaltung erfolgt über Telnet/CLI (Port 23).
+
+Hinweis: Das Setzen von `channel mode advanced` erfordert in der Regel einen Reboot aller Geräte.
+
+## Namenskonzept
+- Wir pflegen den **WebName** auf den Geräten.
+- Encoder: WebName = SourceName (global eindeutig)
+- Decoder: Auswahl ausschließlich über SourceName (keine Zahlen in der Bedienung)
+
+## Channel-Schema
+Wir nutzen ein Schema mit Service-Bereichen + fortlaufender Source-ID `n`:
+
+- VideoCH = 1000 + n
+- AudioCH = 2000 + n
+- USBCH  = 3000 + n
+
+`n` wird automatisch als **nächster freier Index** vergeben (Registry).
+
+## Module
+- **Configurator**: IP-Scan + WebName auslesen + Encoder/Decoder anlegen
+- **Registry**: globale Sources aus Encoder-Instanzen, Validierung, NextFree-Index
+- **Encoder**: SourceName/WebName, Auto-Assign nach Schema, Apply Channels
+- **Decoder**: Video/Audio/USB getrennt, Audio folgt Video, USB folgt Video, Presets
+
+## SymBox-Hinweis
+Bei Problemen mit Modul-Caching: Repository ggf. entfernen und SymBox rebooten.

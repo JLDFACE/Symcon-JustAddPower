@@ -1,0 +1,11 @@
+{
+  "id": "{8C9C2A0F-9D2B-4E1A-8E1F-7A2B7A0C1E10}",
+  "name": "JAP MaxColor Source Registry",
+  "type": 3,
+  "vendor": "Just Add Power",
+  "aliases": ["JAP Source Registry"],
+  "parentRequirements": [],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "JAPMC"
+}
