@@ -1,34 +1,91 @@
 {
   "elements": [
-    { "type": "ValidationTextBox", "name": "Host", "caption": "Decoder IP" },
-    { "type": "NumberSpinner", "name": "Port", "caption": "Telnet Port", "minimum": 1, "maximum": 65535 },
-    { "type": "CheckBox", "name": "UseCRLF", "caption": "CRLF senden (\\r\\n)" },
-
-    { "type": "NumberSpinner", "name": "RegistryInstanceID", "caption": "Registry InstanceID", "minimum": 0, "maximum": 999999 },
-
-    { "type": "NumberSpinner", "name": "CommandDelayMs", "caption": "Command Delay (ms)", "minimum": 0, "maximum": 2000 },
-
-    { "type": "CheckBox", "name": "DefaultAudioFollowsVideo", "caption": "Default: Audio folgt Video" },
-    { "type": "CheckBox", "name": "DefaultUSBFollowsVideo", "caption": "Default: USB folgt Video" },
-
+    {
+      "type": "ValidationTextBox",
+      "name": "Host",
+      "caption": "Decoder IP"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "Port",
+      "caption": "Telnet Port",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    {
+      "type": "CheckBox",
+      "name": "UseCRLF",
+      "caption": "CRLF senden (\\r\\n)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "RegistryInstanceID",
+      "caption": "Registry InstanceID",
+      "minimum": 0,
+      "maximum": 999999
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "CommandDelayMs",
+      "caption": "Command Delay (ms)",
+      "minimum": 0,
+      "maximum": 2000
+    },
+    {
+      "type": "CheckBox",
+      "name": "DefaultAudioFollowsVideo",
+      "caption": "Default: Audio folgt Video"
+    },
+    {
+      "type": "CheckBox",
+      "name": "DefaultUSBFollowsVideo",
+      "caption": "Default: USB folgt Video"
+    },
     {
       "type": "List",
       "name": "Presets",
       "caption": "Presets (SourceNames; Audio/USB leer => folgt Video)",
       "add": true,
       "delete": true,
-      "sort": { "column": "Name", "direction": "ascending" },
+      "sort": {
+        "column": "Name",
+        "direction": "ascending"
+      },
       "columns": [
-        { "name": "Name", "caption": "Preset", "width": "240px" },
-        { "name": "VideoSource", "caption": "Video", "width": "220px" },
-        { "name": "AudioSource", "caption": "Audio (optional)", "width": "220px" },
-        { "name": "USBSource",   "caption": "USB (optional)", "width": "220px" }
+        {
+          "name": "Name",
+          "caption": "Preset",
+          "width": "240px"
+        },
+        {
+          "name": "VideoSource",
+          "caption": "Video",
+          "width": "220px"
+        },
+        {
+          "name": "AudioSource",
+          "caption": "Audio (optional)",
+          "width": "220px"
+        },
+        {
+          "name": "USBSource",
+          "caption": "USB (optional)",
+          "width": "220px"
+        }
       ],
       "values": []
     }
   ],
   "actions": [
-    { "type": "Button", "caption": "Sources/Dropdowns aktualisieren", "onClick": "JAPMC_RefreshSources($id);" },
-    { "type": "Button", "caption": "Preset anwenden (aus Variable)", "onClick": "JAPMC_ApplySelectedPreset($id);" }
+    {
+      "type": "Button",
+      "caption": "Sources/Dropdowns aktualisieren",
+      "onClick": "JAPMC_RefreshSources($id);"
+    },
+    {
+      "type": "Button",
+      "caption": "Preset anwenden (aus Variable)",
+      "onClick": "JAPMC_ApplySelectedPreset($id);"
+    }
   ]
 }

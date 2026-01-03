@@ -6,7 +6,6 @@ class JAPMaxColorSourceRegistry extends IPSModule
     {
         parent::Create();
 
-        // Schema Defaults
         $this->RegisterPropertyInteger("VideoBase", 1000);
         $this->RegisterPropertyInteger("AudioBase", 2000);
         $this->RegisterPropertyInteger("USBBase", 3000);
@@ -73,15 +72,14 @@ class JAPMaxColorSourceRegistry extends IPSModule
         $this->WriteAttributeString("LastValidation", json_encode($payload));
 
         if (count($errors) > 0) {
-            $this->SetStatus(104); // Warning
+            $this->SetStatus(104);
             $this->SendDebug("JAPMC Registry", "Validation errors: " . json_encode($errors), 0);
         } else {
-            $this->SetStatus(102); // Active
+            $this->SetStatus(102);
             $this->SendDebug("JAPMC Registry", "Validation OK (" . count($sources) . " sources)", 0);
         }
     }
 
-    // Public API (Wrapper-Funktionen werden von IP-Symcon erzeugt, keine eigenen Globals)
     public function RegistryGetSources()
     {
         return $this->BuildSourcesFromEncoders();
@@ -115,7 +113,6 @@ class JAPMaxColorSourceRegistry extends IPSModule
             $a = (int)$s["Audio"];
             $u = (int)$s["USB"];
 
-            // Index aus Schema ableiten (best effort)
             $nv = $v - $videoBase;
             $na = $a - $audioBase;
             $nu = $u - $usbBase;
@@ -155,7 +152,6 @@ class JAPMaxColorSourceRegistry extends IPSModule
             );
         }
 
-        // sort by Name
         usort($sources, function ($x, $y) {
             $a = isset($x["Name"]) ? (string)$x["Name"] : "";
             $b = isset($y["Name"]) ? (string)$y["Name"] : "";

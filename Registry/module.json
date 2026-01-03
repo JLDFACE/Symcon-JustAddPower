@@ -3,7 +3,9 @@
   "name": "JAP MaxColor Source Registry",
   "type": 3,
   "vendor": "Just Add Power",
-  "aliases": ["JAP Source Registry"],
+  "aliases": [
+    "JAP Source Registry"
+  ],
   "parentRequirements": [],
   "childRequirements": [],
   "implemented": [],

@@ -28,7 +28,6 @@ class JAPMaxColorConfigurator extends IPSModule
         $form = json_decode(file_get_contents(__DIR__ . "/form.json"), true);
         if (!is_array($form)) $form = array();
 
-        // last element is configurator
         $idx = count($form["elements"]) - 1;
         $form["elements"][$idx]["values"] = $this->BuildValues();
         return json_encode($form);
@@ -55,8 +54,6 @@ class JAPMaxColorConfigurator extends IPSModule
         $this->WriteAttributeString("Discovered", json_encode($found));
         $this->SendDebug("JAPMC", "Scan finished: " . count($found) . " candidates", 0);
     }
-
-    // ----- UI values -----
 
     private function BuildValues()
     {
@@ -113,8 +110,6 @@ class JAPMaxColorConfigurator extends IPSModule
         return $values;
     }
 
-    // ----- Discovery helpers -----
-
     private function ScanRange($FromIP, $ToIP, $Port, $ConnectTimeoutMs)
     {
         $from = ip2long($FromIP);
@@ -169,13 +164,11 @@ class JAPMaxColorConfigurator extends IPSModule
 
         stream_set_timeout($fp, 0, max(50000, ((int)$ReadTimeoutMs) * 1000));
 
-        // Best effort: optional initial read
         @fread($fp, 2048);
 
         $cmd = "astparam g webname" . ($UseCRLF ? "\r\n" : "\n");
         @fwrite($fp, $cmd);
 
-        // read response
         $buf = "";
         $start = microtime(true);
         while ((microtime(true) - $start) < (max(0.05, ((int)$ReadTimeoutMs) / 1000.0))) {
@@ -215,8 +208,6 @@ class JAPMaxColorConfigurator extends IPSModule
         }
         return "";
     }
-
-    // ----- Instance helpers -----
 
     private function FindInstanceByHost($ModuleID, $IP)
     {

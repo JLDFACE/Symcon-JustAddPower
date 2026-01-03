@@ -1,13 +1,48 @@
 {
   "elements": [
-    { "type": "NumberSpinner", "name": "VideoBase", "caption": "Video Base", "minimum": 0, "maximum": 9999 },
-    { "type": "NumberSpinner", "name": "AudioBase", "caption": "Audio Base", "minimum": 0, "maximum": 9999 },
-    { "type": "NumberSpinner", "name": "USBBase", "caption": "USB Base", "minimum": 0, "maximum": 9999 },
-    { "type": "NumberSpinner", "name": "BlockSize", "caption": "Block Size", "minimum": 1, "maximum": 10000 },
-    { "type": "CheckBox", "name": "AllowDuplicateChannels", "caption": "Duplicate Channels erlauben (nicht empfohlen)" }
+    {
+      "type": "NumberSpinner",
+      "name": "VideoBase",
+      "caption": "Video Base",
+      "minimum": 0,
+      "maximum": 9999
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "AudioBase",
+      "caption": "Audio Base",
+      "minimum": 0,
+      "maximum": 9999
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "USBBase",
+      "caption": "USB Base",
+      "minimum": 0,
+      "maximum": 9999
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "BlockSize",
+      "caption": "Block Size",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    {
+      "type": "CheckBox",
+      "name": "AllowDuplicateChannels",
+      "caption": "Duplicate Channels erlauben (nicht empfohlen)"
+    }
   ],
   "actions": [
-    { "type": "Button", "caption": "Validierung ausführen", "onClick": "JAPMC_Validate($id);" },
-    { "type": "Label", "caption": "Hinweis: Sources werden automatisch aus Encoder-Instanzen aggregiert." }
+    {
+      "type": "Button",
+      "caption": "Validierung ausf\u00fchren",
+      "onClick": "JAPMC_Validate($id);"
+    },
+    {
+      "type": "Label",
+      "caption": "Hinweis: Sources werden automatisch aus Encoder-Instanzen aggregiert."
+    }
   ]
 }

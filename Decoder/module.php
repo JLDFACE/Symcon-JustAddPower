@@ -20,7 +20,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
         $this->RegisterPropertyString("Presets", "[]");
 
-        // Auswahlvariablen als Index in der (registry-)Source-Liste
         $this->RegisterVariableInteger("VideoSource", "Video Quelle", "", 10);
         $this->EnableAction("VideoSource");
 
@@ -47,7 +46,7 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $this->RegisterAttributeString("SelectedUSBName", "");
         $this->RegisterAttributeString("Initialized", "0");
 
-        // Periodisch Source/Profile refreshen (auch wenn Encoder/Registry geändert wurden)
+        // FIX: Timer script must be valid PHP at runtime; use $_IPS["TARGET"]
         $this->RegisterTimer("RefreshTimer", 60000, 'JAPMC_RefreshSources($_IPS["TARGET"]);');
     }
 
@@ -62,7 +61,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
             IPS_ApplyChanges($parentID);
         }
 
-        // Init Defaults (nur einmal)
         if ($this->ReadAttributeString("Initialized") !== "1") {
             SetValueBoolean($this->GetIDForIdent("AudioFollowsVideo"), $this->ReadPropertyBoolean("DefaultAudioFollowsVideo"));
             SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), $this->ReadPropertyBoolean("DefaultUSBFollowsVideo"));
@@ -137,7 +135,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
             SetValueInteger($this->GetIDForIdent("AudioSource"), $idx);
 
-            // Override => follow deaktivieren
             if (GetValueBoolean($this->GetIDForIdent("AudioFollowsVideo"))) {
                 SetValueBoolean($this->GetIDForIdent("AudioFollowsVideo"), false);
             }
@@ -158,7 +155,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
             SetValueInteger($this->GetIDForIdent("USBSource"), $idx);
 
-            // Override => follow deaktivieren
             if (GetValueBoolean($this->GetIDForIdent("USBFollowsVideo"))) {
                 SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), false);
             }
@@ -221,8 +217,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
         $this->SyncSourceProfile($sources);
         $this->SyncPresetProfile($presets);
-
-        // Re-select based on remembered names
         $this->RestoreSelections($sources);
 
         $this->WriteAttributeString("ProfileHash", $hash);
@@ -271,7 +265,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
             }
         });
 
-        // Set dropdown indices (best effort)
         $sources = $this->GetSourcesFromRegistry();
         $vIdx = $this->FindSourceIndexByName($video);
         if ($vIdx >= 0) SetValueInteger($this->GetIDForIdent("VideoSource"), $vIdx);
@@ -284,8 +277,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $uIdx = $this->FindSourceIndexByName($uName);
         if ($uIdx >= 0) SetValueInteger($this->GetIDForIdent("USBSource"), $uIdx);
     }
-
-    // ---- Internals ----
 
     private function SwitchServiceBySourceName($Service, $SourceName)
     {

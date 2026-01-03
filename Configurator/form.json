@@ -1,25 +1,78 @@
 {
   "elements": [
-    { "type": "ValidationTextBox", "name": "ScanFrom", "caption": "Scan von IP", "value": "172.27.92.1" },
-    { "type": "ValidationTextBox", "name": "ScanTo", "caption": "Scan bis IP", "value": "172.27.92.254" },
-    { "type": "NumberSpinner", "name": "Port", "caption": "Port", "minimum": 1, "maximum": 65535, "value": 23 },
-
-    { "type": "NumberSpinner", "name": "ConnectTimeoutMs", "caption": "Connect Timeout (ms)", "minimum": 50, "maximum": 5000, "value": 250 },
-    { "type": "NumberSpinner", "name": "ReadTimeoutMs", "caption": "Read Timeout (ms)", "minimum": 50, "maximum": 5000, "value": 400 },
-    { "type": "CheckBox", "name": "UseCRLF", "caption": "CRLF senden (\\r\\n)", "value": true },
-
-    { "type": "Button", "caption": "Scan starten", "onClick": "JAPMC_Scan($id);" },
-
+    {
+      "type": "ValidationTextBox",
+      "name": "ScanFrom",
+      "caption": "Scan von IP",
+      "value": "172.27.92.1"
+    },
+    {
+      "type": "ValidationTextBox",
+      "name": "ScanTo",
+      "caption": "Scan bis IP",
+      "value": "172.27.92.254"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "Port",
+      "caption": "Port",
+      "minimum": 1,
+      "maximum": 65535,
+      "value": 23
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "ConnectTimeoutMs",
+      "caption": "Connect Timeout (ms)",
+      "minimum": 50,
+      "maximum": 5000,
+      "value": 250
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "ReadTimeoutMs",
+      "caption": "Read Timeout (ms)",
+      "minimum": 50,
+      "maximum": 5000,
+      "value": 400
+    },
+    {
+      "type": "CheckBox",
+      "name": "UseCRLF",
+      "caption": "CRLF senden (\\r\\n)",
+      "value": true
+    },
+    {
+      "type": "Button",
+      "caption": "Scan starten",
+      "onClick": "JAPMC_Scan($id);"
+    },
     {
       "type": "Configurator",
       "name": "Devices",
-      "caption": "Gefundene Geräte",
+      "caption": "Gefundene Ger\u00e4te",
       "rowCount": 12,
       "columns": [
-        { "name": "IP", "caption": "IP", "width": "140px" },
-        { "name": "WebName", "caption": "WebName", "width": "260px" },
-        { "name": "EncoderInstanceID", "caption": "Encoder", "width": "90px" },
-        { "name": "DecoderInstanceID", "caption": "Decoder", "width": "90px" }
+        {
+          "name": "IP",
+          "caption": "IP",
+          "width": "140px"
+        },
+        {
+          "name": "WebName",
+          "caption": "WebName",
+          "width": "260px"
+        },
+        {
+          "name": "EncoderInstanceID",
+          "caption": "Encoder",
+          "width": "90px"
+        },
+        {
+          "name": "DecoderInstanceID",
+          "caption": "Decoder",
+          "width": "90px"
+        }
       ],
       "values": []
     }

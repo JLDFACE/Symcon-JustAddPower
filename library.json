@@ -1,9 +1,9 @@
 {
   "id": "{0F7E3D3C-8D86-4D2B-8F43-8E5F7D2C3B10}",
-  "author": "FACE GmbH",
+  "author": "Your Company",
   "name": "Just Add Power MaxColor (Flexible Mode)",
-  "url": "https://github.com/JLDFACE/Symcon-JustAddPower",
+  "url": "https://github.com/yourorg/Symcon-JustAddPower",
   "version": "1.0",
-  "build": 1,
+  "build": 101,
   "date": 1767398400
 }

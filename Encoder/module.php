@@ -36,7 +36,6 @@ class JAPMaxColorEncoderFlexible extends IPSModule
             IPS_ApplyChanges($parentID);
         }
 
-        // Optional Auto-Assign
         if ($this->ReadPropertyBoolean("AutoAssignFromSchema")) {
             $this->AutoAssignIfNeeded();
         }
@@ -84,9 +83,9 @@ class JAPMaxColorEncoderFlexible extends IPSModule
 
         $this->WithLock(function () use ($v, $a, $u) {
             $this->SendCliCommand("channel -v " . $v);
-            $this->Delay();
+            IPS_Sleep(100);
             $this->SendCliCommand("channel -a " . $a);
-            $this->Delay();
+            IPS_Sleep(100);
             $this->SendCliCommand("channel -u " . $u);
         });
     }
@@ -102,12 +101,10 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $a = (int)$this->ReadPropertyInteger("AudioChannel");
         $u = (int)$this->ReadPropertyInteger("USBChannel");
 
-        // Nur setzen, wenn noch nicht konfiguriert
         if ($v != 0 || $a != 0 || $u != 0) {
             return;
         }
 
-        // NextFree Index aus Registry
         $n = @JAPMC_RegistryGetNextFreeIndex($regID);
         if (!is_int($n) || $n < 0) {
             IPS_LogMessage("JAPMC", "Registry has no free index (or not available).");
@@ -122,7 +119,6 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         IPS_SetProperty($this->InstanceID, "AudioChannel", $audioBase + $n);
         IPS_SetProperty($this->InstanceID, "USBChannel",   $usbBase + $n);
 
-        // ApplyChanges erneut, um Properties zu übernehmen
         IPS_ApplyChanges($this->InstanceID);
     }
 
@@ -141,13 +137,10 @@ class JAPMaxColorEncoderFlexible extends IPSModule
 
     private function SendCliCommandAndBestEffortRead($Command)
     {
-        // In IP-Symcon ist Read über Client Socket nicht garantiert synchron verfügbar.
-        // Wir senden und warten kurz; ReceiveData schreibt in LastResponse.
         $this->WithLock(function () use ($Command) {
             $this->SendCliCommand($Command);
         });
 
-        // kurze Wartezeit (best effort)
         IPS_Sleep(200);
         $id = $this->GetIDForIdent("LastResponse");
         return (string)GetValueString($id);
@@ -160,7 +153,6 @@ class JAPMaxColorEncoderFlexible extends IPSModule
             $t = trim($l);
             if ($t === "") continue;
 
-            // Häufig: "webname=XYZ" oder nur "XYZ"
             if (stripos($t, "webname") !== false) {
                 $parts = preg_split("/=|:/", $t);
                 if (is_array($parts) && count($parts) >= 2) {
@@ -169,7 +161,6 @@ class JAPMaxColorEncoderFlexible extends IPSModule
                     if ($candidate !== "") return $candidate;
                 }
             } else {
-                // erster nichtleerer Kandidat
                 $candidate = trim($t, "\"'");
                 if ($candidate !== "" && strlen($candidate) < 128) {
                     return $candidate;
@@ -190,11 +181,5 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         } finally {
             IPS_SemaphoreLeave($key);
         }
-    }
-
-    private function Delay()
-    {
-        // konservativ: 100ms
-        IPS_Sleep(100);
     }
 }

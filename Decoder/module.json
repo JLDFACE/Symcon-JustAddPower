@@ -1,10 +1,14 @@
 {
   "id": "{6D3F1D0A-7D4B-4C1C-9A1A-2B7C0E1D3F20}",
-  "name": "JAP MaxColor Decoder (Flexible)",
+  "name": "JAP MaxColor Decoder Flexible",
   "type": 3,
   "vendor": "Just Add Power",
-  "aliases": ["JAP Decoder Flexible Mode"],
-  "parentRequirements": ["{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}"],
+  "aliases": [
+    "JAP Decoder Flexible Mode"
+  ],
+  "parentRequirements": [
+    "{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}"
+  ],
   "childRequirements": [],
   "implemented": [],
   "prefix": "JAPMC"

@@ -1,4 +1,4 @@
-# Just Add Power MaxColor (Flexible Mode) – IP-Symcon
+# Symcon-JustAddPower (Just Add Power MaxColor) – IP-Symcon
 
 ## Betriebsmodus
 Dieses Modul-Set ist für **Flexible Mode (advanced)** gedacht, d. h. Video/Audio/USB werden getrennt geschaltet.
@@ -12,7 +12,7 @@ Hinweis: Das Setzen von `channel mode advanced` erfordert in der Regel einen Reb
 - Decoder: Auswahl ausschließlich über SourceName (keine Zahlen in der Bedienung)
 
 ## Channel-Schema
-Wir nutzen ein Schema mit Service-Bereichen + fortlaufender Source-ID `n`:
+Service-Bereiche + fortlaufender Source-Index `n`:
 
 - VideoCH = 1000 + n
 - AudioCH = 2000 + n
