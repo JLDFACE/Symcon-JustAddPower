@@ -1,6 +1,6 @@
 <?php
 
-class JAPMCEncoderFlexible extends IPSModule
+class JAPMaxColorEncoderFlexible extends IPSModule
 {
     public function Create()
     {

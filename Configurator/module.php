@@ -1,6 +1,6 @@
 <?php
 
-class JAPMCConfigurator extends IPSModule
+class JAPMaxColorConfigurator extends IPSModule
 {
     public function Create()
     {

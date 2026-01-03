@@ -1,6 +1,6 @@
 <?php
 
-class JAPMCSourceRegistry extends IPSModule
+class JAPMaxColorSourceRegistry extends IPSModule
 {
     public function Create()
     {
