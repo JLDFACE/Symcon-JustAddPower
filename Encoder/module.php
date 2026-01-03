@@ -6,6 +6,7 @@ class JAPMaxColorEncoderFlexible extends IPSModule
     {
         parent::Create();
 
+        // Client Socket (I/O)
         $this->RequireParent("{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}");
 
         $this->RegisterPropertyString("Host", "172.27.92.10");
@@ -29,13 +30,18 @@ class JAPMaxColorEncoderFlexible extends IPSModule
     {
         parent::ApplyChanges();
 
-        $parentID = $this->GetParentID();
-        if ($parentID > 0) {
-            IPS_SetProperty($parentID, "Host", $this->ReadPropertyString("Host"));
-            IPS_SetProperty($parentID, "Port", $this->ReadPropertyInteger("Port"));
-            IPS_ApplyChanges($parentID);
-        }
+        // Parent (Client Socket) konfigurieren
+        $inst = IPS_GetInstance($this->InstanceID);
+$parentID = isset($inst["ConnectionID"]) ? (int)$inst["ConnectionID"] : 0;
 
+if ($parentID > 0 && IPS_InstanceExists($parentID)) {
+    IPS_SetProperty($parentID, "Host", $this->ReadPropertyString("Host"));
+    IPS_SetProperty($parentID, "Port", $this->ReadPropertyInteger("Port"));
+    IPS_ApplyChanges($parentID);
+}
+
+
+        // Optional Auto-Assign
         if ($this->ReadPropertyBoolean("AutoAssignFromSchema")) {
             $this->AutoAssignIfNeeded();
         }
@@ -45,17 +51,13 @@ class JAPMaxColorEncoderFlexible extends IPSModule
 
     public function ReceiveData($JSONString)
     {
+        // SIMPLE: Buffer ist ein String (nicht base64)
         $data = json_decode($JSONString, true);
         if (!is_array($data) || !isset($data["Buffer"])) {
             return;
         }
 
-        $buffer = base64_decode($data["Buffer"]);
-        if ($buffer === false) {
-            return;
-        }
-
-        $buffer = trim($buffer);
+        $buffer = trim((string)$data["Buffer"]);
         if ($buffer !== "") {
             SetValueString($this->GetIDForIdent("LastResponse"), $buffer);
             $this->SendDebug("JAPMC ENC RX", $buffer, 0);
@@ -90,6 +92,8 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         });
     }
 
+    // ---------------- Internals ----------------
+
     private function AutoAssignIfNeeded()
     {
         $regID = (int)$this->ReadPropertyInteger("RegistryInstanceID");
@@ -101,6 +105,7 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $a = (int)$this->ReadPropertyInteger("AudioChannel");
         $u = (int)$this->ReadPropertyInteger("USBChannel");
 
+        // Nur setzen, wenn noch nicht konfiguriert
         if ($v != 0 || $a != 0 || $u != 0) {
             return;
         }
@@ -124,26 +129,29 @@ class JAPMaxColorEncoderFlexible extends IPSModule
 
     private function SendCliCommand($Command)
     {
-        $suffix = $this->ReadPropertyBoolean("UseCRLF") ? "\r\n" : "\n";
+        // SIMPLE: DataID + Buffer als Klartext
+        $suffix  = $this->ReadPropertyBoolean("UseCRLF") ? "\r\n" : "\n";
         $payload = $Command . $suffix;
 
         $data = array(
-            "DataID" => "{C8792760-65CF-4C53-B5C7-A30FCC84FEFE}",
-            "Buffer" => base64_encode($payload)
+            "DataID" => "{79827379-F36E-4ADA-8A95-5F8D1DC92FA9}",
+            "Buffer" => $payload
         );
+
         $this->SendDataToParent(json_encode($data));
         $this->SendDebug("JAPMC ENC TX", $Command, 0);
     }
 
     private function SendCliCommandAndBestEffortRead($Command)
     {
+        // In IP-Symcon ist Read über Client Socket nicht synchron garantiert:
+        // Wir senden und warten kurz; ReceiveData schreibt in LastResponse.
         $this->WithLock(function () use ($Command) {
             $this->SendCliCommand($Command);
         });
 
-        IPS_Sleep(200);
-        $id = $this->GetIDForIdent("LastResponse");
-        return (string)GetValueString($id);
+        IPS_Sleep(250);
+        return (string)GetValueString($this->GetIDForIdent("LastResponse"));
     }
 
     private function ParseWebName($Response)
@@ -151,14 +159,18 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $lines = preg_split("/\r\n|\n|\r/", (string)$Response);
         foreach ($lines as $l) {
             $t = trim($l);
-            if ($t === "") continue;
+            if ($t === "") {
+                continue;
+            }
 
             if (stripos($t, "webname") !== false) {
                 $parts = preg_split("/=|:/", $t);
                 if (is_array($parts) && count($parts) >= 2) {
                     $candidate = trim($parts[count($parts) - 1]);
                     $candidate = trim($candidate, "\"'");
-                    if ($candidate !== "") return $candidate;
+                    if ($candidate !== "") {
+                        return $candidate;
+                    }
                 }
             } else {
                 $candidate = trim($t, "\"'");

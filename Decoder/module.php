@@ -6,6 +6,7 @@ class JAPMaxColorDecoderFlexible extends IPSModule
     {
         parent::Create();
 
+        // Client Socket (I/O)
         $this->RequireParent("{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}");
 
         $this->RegisterPropertyString("Host", "172.27.92.50");
@@ -46,7 +47,7 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $this->RegisterAttributeString("SelectedUSBName", "");
         $this->RegisterAttributeString("Initialized", "0");
 
-        // FIX: Timer script must be valid PHP at runtime; use $_IPS["TARGET"]
+        // FIX: Timer-Script muss eval-fähiges PHP sein
         $this->RegisterTimer("RefreshTimer", 60000, 'JAPMC_RefreshSources($_IPS["TARGET"]);');
     }
 
@@ -54,13 +55,18 @@ class JAPMaxColorDecoderFlexible extends IPSModule
     {
         parent::ApplyChanges();
 
-        $parentID = $this->GetParentID();
-        if ($parentID > 0) {
-            IPS_SetProperty($parentID, "Host", $this->ReadPropertyString("Host"));
-            IPS_SetProperty($parentID, "Port", $this->ReadPropertyInteger("Port"));
-            IPS_ApplyChanges($parentID);
-        }
+        // Parent (Client Socket) konfigurieren
+        $inst = IPS_GetInstance($this->InstanceID);
+$parentID = isset($inst["ConnectionID"]) ? (int)$inst["ConnectionID"] : 0;
 
+if ($parentID > 0 && IPS_InstanceExists($parentID)) {
+    IPS_SetProperty($parentID, "Host", $this->ReadPropertyString("Host"));
+    IPS_SetProperty($parentID, "Port", $this->ReadPropertyInteger("Port"));
+    IPS_ApplyChanges($parentID);
+}
+
+
+        // Defaults einmalig setzen
         if ($this->ReadAttributeString("Initialized") !== "1") {
             SetValueBoolean($this->GetIDForIdent("AudioFollowsVideo"), $this->ReadPropertyBoolean("DefaultAudioFollowsVideo"));
             SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), $this->ReadPropertyBoolean("DefaultUSBFollowsVideo"));
@@ -73,17 +79,13 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
     public function ReceiveData($JSONString)
     {
+        // SIMPLE: Buffer ist String (nicht base64)
         $data = json_decode($JSONString, true);
         if (!is_array($data) || !isset($data["Buffer"])) {
             return;
         }
 
-        $buffer = base64_decode($data["Buffer"]);
-        if ($buffer === false) {
-            return;
-        }
-
-        $buffer = trim($buffer);
+        $buffer = trim((string)$data["Buffer"]);
         if ($buffer !== "") {
             SetValueString($this->GetIDForIdent("LastResponse"), $buffer);
             $this->SendDebug("JAPMC DEC RX", $buffer, 0);
@@ -172,7 +174,9 @@ class JAPMaxColorDecoderFlexible extends IPSModule
                         $this->SwitchServiceBySourceName("a", $vidName);
                     });
                     $idx = $this->FindSourceIndexByName($vidName);
-                    if ($idx >= 0) SetValueInteger($this->GetIDForIdent("AudioSource"), $idx);
+                    if ($idx >= 0) {
+                        SetValueInteger($this->GetIDForIdent("AudioSource"), $idx);
+                    }
                     $this->WriteAttributeString("SelectedAudioName", $vidName);
                 }
             }
@@ -190,7 +194,9 @@ class JAPMaxColorDecoderFlexible extends IPSModule
                         $this->SwitchServiceBySourceName("u", $vidName);
                     });
                     $idx = $this->FindSourceIndexByName($vidName);
-                    if ($idx >= 0) SetValueInteger($this->GetIDForIdent("USBSource"), $idx);
+                    if ($idx >= 0) {
+                        SetValueInteger($this->GetIDForIdent("USBSource"), $idx);
+                    }
                     $this->WriteAttributeString("SelectedUSBName", $vidName);
                 }
             }
@@ -234,7 +240,7 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $p = $presets[$pIdx];
         $video = isset($p["VideoSource"]) ? trim((string)$p["VideoSource"]) : "";
         $audio = isset($p["AudioSource"]) ? trim((string)$p["AudioSource"]) : "";
-        $usb   = isset($p["USBSource"])   ? trim((string)$p["USBSource"])   : "";
+        $usb   = isset($p["USBSource"]) ? trim((string)$p["USBSource"]) : "";
 
         if ($video === "") {
             throw new Exception("Preset has empty VideoSource");
@@ -265,18 +271,25 @@ class JAPMaxColorDecoderFlexible extends IPSModule
             }
         });
 
-        $sources = $this->GetSourcesFromRegistry();
         $vIdx = $this->FindSourceIndexByName($video);
-        if ($vIdx >= 0) SetValueInteger($this->GetIDForIdent("VideoSource"), $vIdx);
+        if ($vIdx >= 0) {
+            SetValueInteger($this->GetIDForIdent("VideoSource"), $vIdx);
+        }
 
         $aName = ($audio === "") ? $video : $audio;
         $aIdx = $this->FindSourceIndexByName($aName);
-        if ($aIdx >= 0) SetValueInteger($this->GetIDForIdent("AudioSource"), $aIdx);
+        if ($aIdx >= 0) {
+            SetValueInteger($this->GetIDForIdent("AudioSource"), $aIdx);
+        }
 
         $uName = ($usb === "") ? $video : $usb;
         $uIdx = $this->FindSourceIndexByName($uName);
-        if ($uIdx >= 0) SetValueInteger($this->GetIDForIdent("USBSource"), $uIdx);
+        if ($uIdx >= 0) {
+            SetValueInteger($this->GetIDForIdent("USBSource"), $uIdx);
+        }
     }
+
+    // ---------------- Internals ----------------
 
     private function SwitchServiceBySourceName($Service, $SourceName)
     {
@@ -300,13 +313,15 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
     private function SendCliCommand($Command)
     {
-        $suffix = $this->ReadPropertyBoolean("UseCRLF") ? "\r\n" : "\n";
+        // SIMPLE: DataID + Buffer als Klartext
+        $suffix  = $this->ReadPropertyBoolean("UseCRLF") ? "\r\n" : "\n";
         $payload = $Command . $suffix;
 
         $data = array(
-            "DataID" => "{C8792760-65CF-4C53-B5C7-A30FCC84FEFE}",
-            "Buffer" => base64_encode($payload)
+            "DataID" => "{79827379-F36E-4ADA-8A95-5F8D1DC92FA9}",
+            "Buffer" => $payload
         );
+
         $this->SendDataToParent(json_encode($data));
         $this->SendDebug("JAPMC DEC TX", $Command, 0);
     }
@@ -346,7 +361,9 @@ class JAPMaxColorDecoderFlexible extends IPSModule
     {
         $raw = $this->ReadPropertyString("Presets");
         $arr = json_decode($raw, true);
-        if (!is_array($arr)) return array();
+        if (!is_array($arr)) {
+            return array();
+        }
         return array_values($arr);
     }
 
@@ -406,22 +423,30 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
         if ($vName !== "") {
             $idx = $this->FindSourceIndexByName($vName);
-            if ($idx >= 0) SetValueInteger($this->GetIDForIdent("VideoSource"), $idx);
+            if ($idx >= 0) {
+                SetValueInteger($this->GetIDForIdent("VideoSource"), $idx);
+            }
         }
         if ($aName !== "") {
             $idx = $this->FindSourceIndexByName($aName);
-            if ($idx >= 0) SetValueInteger($this->GetIDForIdent("AudioSource"), $idx);
+            if ($idx >= 0) {
+                SetValueInteger($this->GetIDForIdent("AudioSource"), $idx);
+            }
         }
         if ($uName !== "") {
             $idx = $this->FindSourceIndexByName($uName);
-            if ($idx >= 0) SetValueInteger($this->GetIDForIdent("USBSource"), $idx);
+            if ($idx >= 0) {
+                SetValueInteger($this->GetIDForIdent("USBSource"), $idx);
+            }
         }
     }
 
     private function GetSourceNameByIndex($Index)
     {
         $sources = $this->GetSourcesFromRegistry();
-        if (!isset($sources[$Index])) return "";
+        if (!isset($sources[$Index])) {
+            return "";
+        }
         return isset($sources[$Index]["Name"]) ? (string)$sources[$Index]["Name"] : "";
     }
 
@@ -431,7 +456,9 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $key = mb_strtolower((string)$Name);
         for ($i = 0; $i < count($sources); $i++) {
             $n = isset($sources[$i]["Name"]) ? (string)$sources[$i]["Name"] : "";
-            if (mb_strtolower($n) === $key) return $i;
+            if (mb_strtolower($n) === $key) {
+                return $i;
+            }
         }
         return -1;
     }
