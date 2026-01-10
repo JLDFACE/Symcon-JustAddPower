@@ -8,6 +8,7 @@ class JAPMaxColorDecoderFlexible extends IPSModule
     {
         parent::Create();
 
+        // Client Socket
         $this->RequireParent("{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}");
 
         $this->RegisterPropertyString("Host", "192.168.10.100");
@@ -48,7 +49,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $this->RegisterAttributeString("SelectedUSBName", "");
         $this->RegisterAttributeString("Initialized", "0");
 
-        // Timer-Kontext hat $_IPS["TARGET"] – das ist hier korrekt
         $this->RegisterTimer("RefreshTimer", 60000, 'JAPMC_RefreshSources($_IPS["TARGET"]);');
     }
 
@@ -59,9 +59,11 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $inst = IPS_GetInstance($this->InstanceID);
         $parentID = isset($inst["ConnectionID"]) ? (int)$inst["ConnectionID"] : 0;
 
+        // Parent konfigurieren + automatisch öffnen
         if ($parentID > 0 && IPS_InstanceExists($parentID)) {
             IPS_SetProperty($parentID, "Host", $this->ReadPropertyString("Host"));
             IPS_SetProperty($parentID, "Port", $this->ReadPropertyInteger("Port"));
+            IPS_SetProperty($parentID, "Open", true);
             IPS_ApplyChanges($parentID);
         }
 

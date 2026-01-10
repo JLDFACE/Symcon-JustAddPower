@@ -58,21 +58,20 @@ class JAPMaxColorConfigurator extends IPSModule
         $found = array();
         foreach ($ips as $ip) {
 
-            // Model holen und auf echte MaxColor filtern
+            // Model holen
             $modelOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "getmodel.sh");
             $model = strtoupper(trim((string)$this->ParseSingleLineValue($modelOut, "getmodel.sh")));
 
+            // Nur echte MaxColor aufnehmen
             if ($model === "" || strpos($model, "MC-") !== 0) {
-                continue; // kein JAP MaxColor
+                continue;
             }
 
             $role = $this->DetectRoleFromModelOutput($model);
 
-            // WebName auslesen (Echo entfernen, dann webname parsen)
+            // Webname holen (Echo/Prompt-bereinigt)
             $webOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "astparam g webname");
-            $web = $this->ParseWebNameFromCommandOutput($webOut, "astparam g webname");
-            $this->SendDebug("JAPMC CFG", "RAW webname (" . $ip . ")=" . json_encode($webOut), 0);
-
+            $web = $this->ParseValueFromAstparamGet($webOut, "astparam g webname");
 
             $found[] = array(
                 "IP" => $ip,
@@ -81,6 +80,9 @@ class JAPMaxColorConfigurator extends IPSModule
                 "ModelRaw" => $model,
                 "RoleOverride" => ""
             );
+
+            // Optionales Debug (bei Bedarf aktivieren)
+            // $this->SendDebug("JAPMC CFG", "RAW webname (" . $ip . ")=" . json_encode($webOut), 0);
         }
 
         $this->WriteAttributeString("Discovered", json_encode($found));
@@ -95,11 +97,10 @@ class JAPMaxColorConfigurator extends IPSModule
         $arr = json_decode($raw, true);
         if (!is_array($arr)) $arr = array();
 
-        // GUIDs müssen zu euren module.json passen
+        // GUIDs müssen zu euren module.json passen:
         $encoderModuleID = "{4E0C3C4A-0C7E-4A44-9B6B-5E1C6F4A2A20}";
         $decoderModuleID = "{6D3F1D0A-7D4B-4C1C-9A1A-2B7C0E1D3F20}";
-
-        $regID = (int)$this->EnsureRegistry();
+        $registryID = (int)$this->EnsureRegistry();
 
         $values = array();
 
@@ -117,15 +118,9 @@ class JAPMaxColorConfigurator extends IPSModule
                 $role = "UNKNOWN";
             }
 
-            // Sanity WebName (nur falls irgendwo Altlasten drin sind)
-            if (!$this->IsPlausibleName($web)) {
-                $web = "";
-            }
-
             $encExisting = $this->FindInstanceByHost($encoderModuleID, $ip);
             $decExisting = $this->FindInstanceByHost($decoderModuleID, $ip);
 
-            // instanceID setzen, falls bereits vorhanden
             $instanceID = 0;
             if ($role === "ENC" && $encExisting > 0) $instanceID = $encExisting;
             if ($role === "DEC" && $decExisting > 0) $instanceID = $decExisting;
@@ -141,8 +136,9 @@ class JAPMaxColorConfigurator extends IPSModule
                 "instanceID" => $instanceID
             );
 
-            // create nur anbieten, wenn keine Instanz existiert (und nicht SKIP)
+            // create nur anbieten, wenn keine Instanz existiert
             if ($instanceID == 0 && $override !== "SKIP") {
+
                 if ($role === "ENC") {
                     $rowOut["create"] = array(
                         "moduleID" => $encoderModuleID,
@@ -150,8 +146,10 @@ class JAPMaxColorConfigurator extends IPSModule
                         "configuration" => array(
                             "Host" => $ip,
                             "Port" => (int)$this->ReadPropertyInteger("Port"),
+                            // WICHTIG: Client Socket automatisch öffnen
+                            "Open" => true,
                             "UseCRLF" => (bool)$this->ReadPropertyBoolean("UseCRLF"),
-                            "RegistryInstanceID" => $regID,
+                            "RegistryInstanceID" => $registryID,
                             "SourceName" => $web,
                             "AutoAssignFromSchema" => true,
                             "VideoChannel" => 0,
@@ -166,8 +164,10 @@ class JAPMaxColorConfigurator extends IPSModule
                         "configuration" => array(
                             "Host" => $ip,
                             "Port" => (int)$this->ReadPropertyInteger("Port"),
+                            // WICHTIG: Client Socket automatisch öffnen
+                            "Open" => true,
                             "UseCRLF" => (bool)$this->ReadPropertyBoolean("UseCRLF"),
-                            "RegistryInstanceID" => $regID
+                            "RegistryInstanceID" => $registryID
                         )
                     );
                 }
@@ -179,32 +179,12 @@ class JAPMaxColorConfigurator extends IPSModule
         return $values;
     }
 
-    private function ParseValueFromAstparamGet($Response, $CommandEcho)
-{
-    $lines = $this->CleanTelnetLines($Response, $CommandEcho);
-
-    foreach ($lines as $t) {
-        if (strpos($t, "=") !== false) {
-            $parts = explode("=", $t, 2);
-            $candidate = trim($parts[1]);
-            $candidate = trim($candidate, "\"' \t");
-            if ($this->IsPlausibleName($candidate)) return $candidate;
-        }
-
-        $candidate = trim($t, "\"' \t");
-        if ($this->IsPlausibleName($candidate)) return $candidate;
-    }
-
-    return "";
-}
-
-
     private function DetectRoleFromModelOutput($ModelOutput)
     {
         $t = strtoupper(trim((string)$ModelOutput));
         if ($t === "") return "UNKNOWN";
 
-        // Robust für viele Varianten: MC-RX1, MC-TX2, MC-RX0589C9, MC-TX00ABCD, ...
+        // Robust: MC-RX1, MC-TX2, MC-RX0589C9, MC-TX00ABCD, ...
         if (preg_match('/\bMC-[A-Z0-9_-]*RX[A-Z0-9_-]*\b/', $t)) return "DEC";
         if (preg_match('/\bMC-[A-Z0-9_-]*TX[A-Z0-9_-]*\b/', $t)) return "ENC";
 
@@ -269,7 +249,7 @@ class JAPMaxColorConfigurator extends IPSModule
 
         stream_set_timeout($fp, 0, max(50000, ((int)$ReadTimeoutMs) * 1000));
 
-        // Banner/Prompt einmal weglesen
+        // Banner/Prompt weglesen
         @fread($fp, 2048);
 
         $cmd = $Command . ($UseCRLF ? "\r\n" : "\n");
@@ -283,32 +263,27 @@ class JAPMaxColorConfigurator extends IPSModule
             $chunk = @fread($fp, 2048);
             if ($chunk === false || $chunk === "") break;
             $buf .= $chunk;
-            if (strlen($buf) > 8192) break;
+            if (strlen($buf) > 16384) break;
         }
 
         fclose($fp);
         return $buf;
     }
 
-    private function ParseWebNameFromCommandOutput($Response, $CommandEcho)
+    private function ParseValueFromAstparamGet($Response, $CommandEcho)
     {
         $lines = $this->CleanTelnetLines($Response, $CommandEcho);
 
-        // 1) webname=... bevorzugt
         foreach ($lines as $t) {
-            if (stripos($t, "webname") !== false) {
-                $parts = preg_split("/=|:/", $t);
-                if (is_array($parts) && count($parts) >= 2) {
-                    $candidate = trim($parts[count($parts) - 1]);
-                    $candidate = trim($candidate, "\"' \t");
-                    if ($this->IsPlausibleName($candidate)) return $candidate;
-                }
+            if (strpos($t, "=") !== false) {
+                $parts = explode("=", $t, 2);
+                $candidate = trim($parts[1]);
+                $candidate = trim($candidate, "\"' \t");
+                if ($this->IsPlausibleName($candidate)) return $candidate;
             }
-        }
 
-        // 2) Fallback: nur Wert (erste plausible Zeile)
-        foreach ($lines as $t) {
-            if ($this->IsPlausibleName($t)) return $t;
+            $candidate = trim($t, "\"' \t");
+            if ($this->IsPlausibleName($candidate)) return $candidate;
         }
 
         return "";
@@ -318,48 +293,47 @@ class JAPMaxColorConfigurator extends IPSModule
     {
         $lines = $this->CleanTelnetLines($Response, $CommandEcho);
         foreach ($lines as $t) {
-            if ($t !== "" && strlen($t) <= 80) return $t;
+            $t = trim($t);
+            if ($t !== "" && strlen($t) <= 120) return $t;
         }
         return "";
     }
 
     private function CleanTelnetLines($Response, $CommandEcho)
-{
-    $echo = mb_strtolower(trim((string)$CommandEcho));
+    {
+        $echo = mb_strtolower(trim((string)$CommandEcho));
 
-    $rawLines = preg_split("/\r\n|\n|\r/", (string)$Response);
-    $out = array();
+        $rawLines = preg_split("/\r\n|\n|\r/", (string)$Response);
+        $out = array();
 
-    foreach ($rawLines as $l) {
-        $t = trim($l);
-        if ($t === "") continue;
+        foreach ($rawLines as $l) {
+            $t = trim($l);
+            if ($t === "") continue;
 
-        $low = mb_strtolower($t);
+            $low = mb_strtolower($t);
 
-        // Echo der eingegebenen Commands entfernen (exakt oder enthalten)
-        if ($echo !== "" && ($low === $echo || strpos($low, $echo) !== false)) continue;
+            // Echo entfernen (exakt oder enthalten)
+            if ($echo !== "" && ($low === $echo || strpos($low, $echo) !== false)) continue;
 
-        // Wenn Prompt an derselben Zeile hängt: abschneiden
-        // typische Prompts: "/usr/local/bin #", "#", "$", ">"
-        $t = preg_replace("/\\s*\\/usr\\/local\\/bin\\s*#\\s*$/", "", $t);
-        $t = preg_replace("/\\s*[>#\\$]\\s*$/", "", $t);
+            // Prompt an derselben Zeile abschneiden
+            $t = preg_replace("/\\s*\\/usr\\/local\\/bin\\s*#\\s*$/", "", $t);
+            $t = preg_replace("/\\s*[>#\\$]\\s*$/", "", $t);
 
-        $t = trim($t);
-        if ($t === "") continue;
+            $t = trim($t);
+            if ($t === "") continue;
 
-        // Standalone Prompt-Zeilen entfernen
-        if (preg_match("/^\\/?usr\\/local\\/bin\\s*#$/", $t)) continue;
-        if (preg_match("/^[>#\\$]$/", $t)) continue;
+            // Standalone Prompts entfernen
+            if (preg_match("/^\\/?usr\\/local\\/bin\\s*#$/", $t)) continue;
+            if (preg_match("/^[>#\\$]$/", $t)) continue;
 
-        // sehr generisch: user@host ...# (optional)
-        if (preg_match("/^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+.*[%#\\$]$/", $t)) continue;
+            // user@host... prompt (konservativ)
+            if (preg_match("/^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+.*[%#\\$]$/", $t)) continue;
 
-        $out[] = $t;
+            $out[] = $t;
+        }
+
+        return $out;
     }
-
-    return $out;
-}
-
 
     private function IsPlausibleName($Name)
     {
@@ -369,15 +343,11 @@ class JAPMaxColorConfigurator extends IPSModule
 
         $low = mb_strtolower($n);
 
-        // Kommando-/Echo-Reste zuverlässig verwerfen
         if (strpos($low, "astparam") !== false) return false;
         if (strpos($low, "getmodel") !== false) return false;
         if (strpos($low, "channel") !== false) return false;
-
-        // Shell-Skripte/Kommandos nie als Namen akzeptieren
         if (substr($low, -3) === ".sh") return false;
 
-        // erlaubte Zeichen (inkl. Leerzeichen, -, _, .)
         if (!preg_match("/^[A-Za-z0-9 _\\-\\.]+$/", $n)) return false;
 
         return true;
