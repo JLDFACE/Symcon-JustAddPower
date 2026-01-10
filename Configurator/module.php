@@ -71,6 +71,8 @@ class JAPMaxColorConfigurator extends IPSModule
             // WebName auslesen (Echo entfernen, dann webname parsen)
             $webOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "astparam g webname");
             $web = $this->ParseWebNameFromCommandOutput($webOut, "astparam g webname");
+            $this->SendDebug("JAPMC CFG", "RAW webname (" . $ip . ")=" . json_encode($webOut), 0);
+
 
             $found[] = array(
                 "IP" => $ip,
