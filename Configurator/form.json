@@ -39,11 +39,10 @@
   ],
   "actions": [
     {
-  "type": "Button",
-  "caption": "Scan starten",
-  "onClick": "JAPMC_Scan($id);"
-}
-,
+      "type": "Button",
+      "caption": "Scan starten",
+      "onClick": "JAPMC_Scan($id);"
+    },
     {
       "type": "Configurator",
       "name": "DeviceList",
@@ -53,7 +52,21 @@
         { "label": "Role", "name": "Role", "width": "80px" },
         { "label": "WebName", "name": "WebName", "width": "250px" },
         { "label": "EncoderID", "name": "EncoderInstanceID", "width": "90px" },
-        { "label": "DecoderID", "name": "DecoderInstanceID", "width": "90px" }
+        { "label": "DecoderID", "name": "DecoderInstanceID", "width": "90px" },
+        {
+          "label": "Manual",
+          "name": "RoleOverride",
+          "width": "120px",
+          "edit": {
+            "type": "Select",
+            "options": [
+              { "label": "Auto", "value": "" },
+              { "label": "Encoder", "value": "ENC" },
+              { "label": "Decoder", "value": "DEC" },
+              { "label": "Skip", "value": "SKIP" }
+            ]
+          }
+        }
       ],
       "values": []
     }

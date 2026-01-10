@@ -6,7 +6,6 @@ class JAPMaxColorSourceRegistry extends IPSModule
     {
         parent::Create();
 
-        // Schema Defaults
         $this->RegisterPropertyInteger("VideoBase", 1000);
         $this->RegisterPropertyInteger("AudioBase", 2000);
         $this->RegisterPropertyInteger("USBBase", 3000);
@@ -75,28 +74,20 @@ class JAPMaxColorSourceRegistry extends IPSModule
         $this->WriteAttributeString("LastValidation", json_encode($payload));
 
         if (count($errors) > 0) {
-            $this->SetStatus(104); // Warning
+            $this->SetStatus(104);
             $this->SendDebug("JAPMC Registry", "Validation errors: " . json_encode($errors), 0);
         } else {
-            $this->SetStatus(102); // Active
+            $this->SetStatus(102);
         }
     }
 
-    /**
-     * Liefert alle Sources als JSON-String (PHPLibrary-konform: string).
-     * @return string JSON-Array
-     */
+    // PHPLibrary-konform: string
     public function RegistryGetSources()
     {
-        $sources = $this->BuildSourcesFromEncoders();
-        return json_encode($sources);
+        return json_encode($this->BuildSourcesFromEncoders());
     }
 
-    /**
-     * Liefert eine Source für einen SourceName als JSON-String (PHPLibrary-konform: string).
-     * @param string $SourceName
-     * @return string JSON-Object oder "null"
-     */
+    // PHPLibrary-konform: string
     public function RegistryResolveSource($SourceName)
     {
         $nameKey = mb_strtolower((string)$SourceName);
@@ -111,10 +102,7 @@ class JAPMaxColorSourceRegistry extends IPSModule
         return json_encode(null);
     }
 
-    /**
-     * Liefert den nächsten freien Index n als int (PHPLibrary-konform: int).
-     * @return int
-     */
+    // PHPLibrary-konform: int
     public function RegistryGetNextFreeIndex()
     {
         $videoBase = (int)$this->ReadPropertyInteger("VideoBase");
@@ -140,32 +128,24 @@ class JAPMaxColorSourceRegistry extends IPSModule
         }
 
         for ($i = 0; $i < $blockSize; $i++) {
-            if (!isset($used[$i])) {
-                return $i;
-            }
+            if (!isset($used[$i])) return $i;
         }
         return -1;
     }
 
     private function BuildSourcesFromEncoders()
     {
-        // Encoder module ID muss zu Encoder/module.json passen
         $encoderModuleID = "{4E0C3C4A-0C7E-4A44-9B6B-5E1C6F4A2A20}";
         $instances = IPS_GetInstanceListByModuleID($encoderModuleID);
 
         $sources = array();
         foreach ($instances as $id) {
-            $name = (string)IPS_GetProperty($id, "SourceName");
-            $v = (int)IPS_GetProperty($id, "VideoChannel");
-            $a = (int)IPS_GetProperty($id, "AudioChannel");
-            $u = (int)IPS_GetProperty($id, "USBChannel");
-
             $sources[] = array(
-                "Name" => $name,
-                "Video" => $v,
-                "Audio" => $a,
-                "USB" => $u,
-                "EncoderInstanceID" => $id
+                "Name" => (string)IPS_GetProperty($id, "SourceName"),
+                "Video" => (int)IPS_GetProperty($id, "VideoChannel"),
+                "Audio" => (int)IPS_GetProperty($id, "AudioChannel"),
+                "USB" => (int)IPS_GetProperty($id, "USBChannel"),
+                "EncoderInstanceID" => (int)$id
             );
         }
 
