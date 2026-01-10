@@ -34,7 +34,6 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $host = (string)$this->ReadPropertyString("Host");
         $port = (int)$this->ReadPropertyInteger("Port");
 
-        // Parent (Client Socket) konfigurieren
         $inst = IPS_GetInstance($this->InstanceID);
         $parentID = isset($inst["ConnectionID"]) ? (int)$inst["ConnectionID"] : 0;
 
@@ -42,14 +41,16 @@ class JAPMaxColorEncoderFlexible extends IPSModule
             IPS_SetProperty($parentID, "Host", $host);
             IPS_SetProperty($parentID, "Port", $port);
 
-            // Auto-Open nur wenn erreichbar
-            if ($this->HasParentOpenProperty($parentID)) {
-                $canConnect = $this->TestTcp($host, $port, 250);
-                IPS_SetProperty($parentID, "Open", $canConnect);
-                $this->SendDebug("JAPMC ENC", "AutoOpen=" . ($canConnect ? "true" : "false") . " for " . $host . ":" . $port, 0);
-            }
+            // Auto-Open nur wenn TCP erreichbar (Port 23)
+            $canConnect = $this->TestTcp($host, $port, 250);
+            $this->SendDebug("JAPMC ENC", "AutoOpen=" . ($canConnect ? "true" : "false") . " for " . $host . ":" . $port, 0);
 
-            // Warnings beim ApplyChanges des Parents abfangen
+            // Open setzen (versions-/property-sicher: Errors abfangen)
+            $this->CallSilenced(function () use ($parentID, $canConnect) {
+                IPS_SetProperty($parentID, "Open", $canConnect);
+            });
+
+            // Parent anwenden (Warnings/Errors abfangen, damit Instanz-Erstellung nie scheitert)
             $this->CallSilenced(function () use ($parentID) {
                 IPS_ApplyChanges($parentID);
             });
@@ -155,11 +156,5 @@ class JAPMaxColorEncoderFlexible extends IPSModule
                 restore_error_handler();
             }
         }
-    }
-
-    private function HasParentOpenProperty($InstanceID)
-    {
-        $props = IPS_GetPropertyList($InstanceID);
-        return is_array($props) && in_array("Open", $props);
     }
 }

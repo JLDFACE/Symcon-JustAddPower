@@ -58,7 +58,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $host = (string)$this->ReadPropertyString("Host");
         $port = (int)$this->ReadPropertyInteger("Port");
 
-        // Parent konfigurieren
         $inst = IPS_GetInstance($this->InstanceID);
         $parentID = isset($inst["ConnectionID"]) ? (int)$inst["ConnectionID"] : 0;
 
@@ -66,12 +65,12 @@ class JAPMaxColorDecoderFlexible extends IPSModule
             IPS_SetProperty($parentID, "Host", $host);
             IPS_SetProperty($parentID, "Port", $port);
 
-            // Auto-Open nur wenn erreichbar
-            if ($this->HasParentOpenProperty($parentID)) {
-                $canConnect = $this->TestTcp($host, $port, 250);
+            $canConnect = $this->TestTcp($host, $port, 250);
+            $this->SendDebug("JAPMC DEC", "AutoOpen=" . ($canConnect ? "true" : "false") . " for " . $host . ":" . $port, 0);
+
+            $this->CallSilenced(function () use ($parentID, $canConnect) {
                 IPS_SetProperty($parentID, "Open", $canConnect);
-                $this->SendDebug("JAPMC DEC", "AutoOpen=" . ($canConnect ? "true" : "false") . " for " . $host . ":" . $port, 0);
-            }
+            });
 
             $this->CallSilenced(function () use ($parentID) {
                 IPS_ApplyChanges($parentID);
@@ -156,7 +155,7 @@ class JAPMaxColorDecoderFlexible extends IPSModule
                 if ($name === "") throw new Exception("Invalid USBSource selection");
 
                 $this->SwitchServiceBySourceName("u", $name);
-                $this->WriteAttributeString("SelectedUSBName", $name);
+                $this->WriteAttributeString("SelectedUSBName"), $name;
             });
 
             SetValueInteger($this->GetIDForIdent("USBSource"), $idx);
@@ -170,38 +169,12 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         if ($Ident == "AudioFollowsVideo") {
             $flag = (bool)$Value;
             SetValueBoolean($this->GetIDForIdent("AudioFollowsVideo"), $flag);
-
-            if ($flag) {
-                $vidName = $this->ReadAttributeString("SelectedVideoName");
-                if ($vidName !== "") {
-                    $this->WithLock(function () use ($vidName) {
-                        $this->SwitchServiceBySourceName("a", $vidName);
-                    });
-
-                    $idx = $this->FindSourceIndexByName($vidName);
-                    if ($idx >= 0) SetValueInteger($this->GetIDForIdent("AudioSource"), $idx);
-                    $this->WriteAttributeString("SelectedAudioName", $vidName);
-                }
-            }
             return;
         }
 
         if ($Ident == "USBFollowsVideo") {
             $flag = (bool)$Value;
             SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), $flag);
-
-            if ($flag) {
-                $vidName = $this->ReadAttributeString("SelectedVideoName");
-                if ($vidName !== "") {
-                    $this->WithLock(function () use ($vidName) {
-                        $this->SwitchServiceBySourceName("u", $vidName);
-                    });
-
-                    $idx = $this->FindSourceIndexByName($vidName);
-                    if ($idx >= 0) SetValueInteger($this->GetIDForIdent("USBSource"), $idx);
-                    $this->WriteAttributeString("SelectedUSBName", $vidName);
-                }
-            }
             return;
         }
 
@@ -220,8 +193,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         if ($hash === $this->ReadAttributeString("ProfileHash")) return;
 
         $this->SyncSourceProfile($sources);
-        $this->RestoreSelections($sources);
-
         $this->WriteAttributeString("ProfileHash", $hash);
     }
 
@@ -263,7 +234,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $json = @JAPMC_RegistryGetSources($regID);
         $arr = json_decode((string)$json, true);
         if (!is_array($arr)) return array();
-
         return $arr;
     }
 
@@ -275,7 +245,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $json = @JAPMC_RegistryResolveSource($regID, (string)$Name);
         $obj = json_decode((string)$json, true);
         if (!is_array($obj)) return null;
-
         return $obj;
     }
 
@@ -304,28 +273,11 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         IPS_SetVariableCustomProfile($this->GetIDForIdent("USBSource"), $profile);
     }
 
-    private function RestoreSelections($Sources)
-    {
-        // optional – kann später ausgebaut werden
-    }
-
     private function GetSourceNameByIndex($Index)
     {
         $sources = $this->GetSourcesFromRegistry();
         if (!isset($sources[$Index])) return "";
         return isset($sources[$Index]["Name"]) ? (string)$sources[$Index]["Name"] : "";
-    }
-
-    private function FindSourceIndexByName($Name)
-    {
-        $sources = $this->GetSourcesFromRegistry();
-        $key = mb_strtolower((string)$Name);
-
-        for ($i = 0; $i < count($sources); $i++) {
-            $n = isset($sources[$i]["Name"]) ? (string)$sources[$i]["Name"] : "";
-            if (mb_strtolower($n) === $key) return $i;
-        }
-        return -1;
     }
 
     private function WithLock($Callable)
@@ -361,11 +313,5 @@ class JAPMaxColorDecoderFlexible extends IPSModule
                 restore_error_handler();
             }
         }
-    }
-
-    private function HasParentOpenProperty($InstanceID)
-    {
-        $props = IPS_GetPropertyList($InstanceID);
-        return is_array($props) && in_array("Open", $props);
     }
 }
