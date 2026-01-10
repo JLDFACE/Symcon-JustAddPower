@@ -48,6 +48,8 @@ class JAPMaxColorConfigurator extends IPSModule
     public function Scan()
     {
         IPS_LogMessage("JAPMC CFG", "Scan() gestartet, Instanz " . $this->InstanceID);
+        IPS_LogMessage("JAPMC", "Scan() called. InstanceID=" . $this->InstanceID);
+
 
         $from = ip2long($this->ReadPropertyString("ScanFrom"));
         $to   = ip2long($this->ReadPropertyString("ScanTo"));
