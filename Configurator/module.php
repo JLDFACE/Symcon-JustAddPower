@@ -44,6 +44,9 @@ class JAPMaxColorConfigurator extends IPSModule
 
     public function Scan()
     {
+        IPS_LogMessage("JAPMC", "Configurator Scan() called on InstanceID=" . $this->InstanceID);
+
+
         $from = $this->ReadPropertyString("ScanFrom");
         $to   = $this->ReadPropertyString("ScanTo");
         $port = (int)$this->ReadPropertyInteger("Port");

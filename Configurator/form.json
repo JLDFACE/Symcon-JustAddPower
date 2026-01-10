@@ -39,10 +39,11 @@
   ],
   "actions": [
     {
-      "type": "Button",
-      "caption": "Scan starten",
-      "onClick": "JAPMC_Scan($id);"
-    },
+  "type": "Button",
+  "caption": "Scan starten",
+  "onClick": "JAPMC_Scan($_IPS[\"TARGET\"]);"
+}
+
     {
       "type": "Configurator",
       "name": "DeviceList",
