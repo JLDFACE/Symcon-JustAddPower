@@ -58,17 +58,19 @@ class JAPMaxColorConfigurator extends IPSModule
         $found = array();
         foreach ($ips as $ip) {
 
-            // 1) Model holen
             $modelOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "getmodel.sh");
-            $model = strtoupper(trim((string)$modelOut));
 
-            // 2) Filter: Nur echte MaxColor aufnehmen (verhindert "Phantom"-Geräte)
-            if ($model === "" || strpos($model, "MC-") !== 0) {
-                continue;
-            }
+// Extrahiere z.B. "MC-RX1" oder "MC-TX2" aus beliebiger Ausgabe (Prompt/Echo/Mehrzeiler)
+$modelToken = $this->ExtractModelToken($modelOut);
 
-            // 3) Role erkennen
-            $role = $this->DetectRoleFromModelOutput($model);
+// Debug in Meldungen (sichtbar ohne Debug-Fenster)
+IPS_LogMessage("JAPMC CFG", "Probe " . $ip . " getmodel.sh raw=" . $this->OneLine($modelOut) . " token=" . $modelToken);
+
+if ($modelToken === "") {
+    continue; // kein MaxColor gefunden
+}
+
+$role = $this->DetectRoleFromModelOutput($modelToken);
 
             // 4) WebName holen (kann je nach Firmware "webname=..." oder nur der Wert sein)
             $webOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "astparam g webname");
@@ -84,6 +86,8 @@ class JAPMaxColorConfigurator extends IPSModule
         }
 
         $this->WriteAttributeString("Discovered", json_encode($found));
+        IPS_LogMessage("JAPMC CFG", "Discovered=" . $this->OneLine(json_encode($found)));
+
 
         IPS_LogMessage("JAPMC CFG", "Scan beendet, gefunden: " . count($found));
         $this->SendDebug("JAPMC CFG", "Discovered=" . json_encode($found), 0);
@@ -223,6 +227,25 @@ class JAPMaxColorConfigurator extends IPSModule
         return $found;
     }
 
+    private function ExtractModelToken($ModelOutput)
+{
+    $t = strtoupper((string)$ModelOutput);
+
+    // sucht "MC-..." irgendwo in der Ausgabe und nimmt das erste passende Token
+    if (preg_match('/\bMC-[A-Z0-9_-]+\b/', $t, $m)) {
+        return trim($m[0]);
+    }
+    return "";
+}
+
+private function OneLine($Text)
+{
+    $s = trim((string)$Text);
+    $s = preg_replace("/\s+/", " ", $s);
+    if (strlen($s) > 160) $s = substr($s, 0, 160) . "...";
+    return $s;
+}
+
     private function TestTcp($Host, $Port, $ConnectTimeoutMs)
     {
         $errno = 0;
@@ -285,7 +308,7 @@ class JAPMaxColorConfigurator extends IPSModule
                     $candidate = trim($candidate, "\"' \t");
                     if ($this->IsPlausibleName($candidate)) return $candidate;
                 }
-            }
+            }ƒ
         }
 
         // 2) fallback: nur der Wert (typisch bei "astparam g webname")
