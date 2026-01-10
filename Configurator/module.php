@@ -11,7 +11,7 @@ class JAPMaxColorConfigurator extends IPSModule
         $this->RegisterPropertyInteger("Port", 23);
 
         $this->RegisterPropertyInteger("ConnectTimeoutMs", 250);
-        $this->RegisterPropertyInteger("ReadTimeoutMs", 400);
+        $this->RegisterPropertyInteger("ReadTimeoutMs", 600);
         $this->RegisterPropertyBoolean("UseCRLF", true);
 
         $this->RegisterAttributeString("Discovered", "[]");
@@ -26,10 +26,19 @@ class JAPMaxColorConfigurator extends IPSModule
     public function GetConfigurationForm()
     {
         $form = json_decode(file_get_contents(__DIR__ . "/form.json"), true);
-        if (!is_array($form)) $form = array();
+        if (!is_array($form)) {
+            $form = array("elements" => array(), "actions" => array());
+        }
 
-        $idx = count($form["elements"]) - 1;
-        $form["elements"][$idx]["values"] = $this->BuildValues();
+        // In unserem form.json sitzt die Device-List in actions[1] (siehe unten).
+        if (isset($form["actions"]) && is_array($form["actions"])) {
+            foreach ($form["actions"] as $k => $a) {
+                if (isset($a["name"]) && $a["name"] === "DeviceList" && isset($a["values"])) {
+                    $form["actions"][$k]["values"] = $this->BuildValues();
+                }
+            }
+        }
+
         return json_encode($form);
     }
 
@@ -43,71 +52,111 @@ class JAPMaxColorConfigurator extends IPSModule
         $rTimeout = (int)$this->ReadPropertyInteger("ReadTimeoutMs");
         $useCRLF  = (bool)$this->ReadPropertyBoolean("UseCRLF");
 
-        $list = $this->ScanRange($from, $to, $port, $cTimeout);
+        $ips = $this->ScanRange($from, $to, $port, $cTimeout);
 
         $found = array();
-        foreach ($list as $ip) {
-            $web = $this->ReadWebNameViaTelnet($ip, $port, $cTimeout, $rTimeout, $useCRLF);
-            $found[] = array("IP" => $ip, "WebName" => $web);
+        foreach ($ips as $ip) {
+            $modelOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "getmodel.sh");
+            $role = $this->DetectRoleFromModelOutput($modelOut); // ENC / DEC / UNKNOWN
+
+            $webOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "astparam g webname");
+            $web = $this->ParseWebName($webOut);
+
+            $found[] = array(
+                "IP" => $ip,
+                "Role" => $role,
+                "WebName" => $web,
+                "ModelRaw" => trim((string)$modelOut)
+            );
         }
 
         $this->WriteAttributeString("Discovered", json_encode($found));
-        $this->SendDebug("JAPMC", "Scan finished: " . count($found) . " candidates", 0);
+        $this->SendDebug("JAPMC CFG", "Scan finished: " . count($found), 0);
     }
 
     private function BuildValues()
     {
         $raw = $this->ReadAttributeString("Discovered");
         $arr = json_decode($raw, true);
-        if (!is_array($arr)) $arr = array();
+        if (!is_array($arr)) {
+            $arr = array();
+        }
 
         $values = array();
+
+        // Diese GUIDs müssen zu deinen module.json passen
         $encoderModuleID = "{4E0C3C4A-0C7E-4A44-9B6B-5E1C6F4A2A20}";
         $decoderModuleID = "{6D3F1D0A-7D4B-4C1C-9A1A-2B7C0E1D3F20}";
 
-        foreach ($arr as $row) {
-            $ip = isset($row["IP"]) ? (string)$row["IP"] : "";
-            $web = isset($row["WebName"]) ? (string)$row["WebName"] : "";
+        $regID = (int)$this->EnsureRegistry();
 
-            $enc = $this->FindInstanceByHost($encoderModuleID, $ip);
-            $dec = $this->FindInstanceByHost($decoderModuleID, $ip);
+        foreach ($arr as $row) {
+            $ip   = isset($row["IP"]) ? (string)$row["IP"] : "";
+            $role = isset($row["Role"]) ? (string)$row["Role"] : "UNKNOWN";
+            $web  = isset($row["WebName"]) ? (string)$row["WebName"] : "";
+
+            $encExisting = $this->FindInstanceByHost($encoderModuleID, $ip);
+            $decExisting = $this->FindInstanceByHost($decoderModuleID, $ip);
+
+            $create = array();
+
+            if ($role === "ENC") {
+                $create[] = array(
+                    "moduleID" => $encoderModuleID,
+                    "name" => ($web !== "") ? ("ENC " . $web) : ("ENC " . $ip),
+                    "configuration" => array(
+                        "Host" => $ip,
+                        "Port" => (int)$this->ReadPropertyInteger("Port"),
+                        "UseCRLF" => (bool)$this->ReadPropertyBoolean("UseCRLF"),
+                        "RegistryInstanceID" => $regID,
+                        "SourceName" => $web,
+                        "AutoAssignFromSchema" => true,
+                        "VideoChannel" => 0,
+                        "AudioChannel" => 0,
+                        "USBChannel" => 0
+                    )
+                );
+            } elseif ($role === "DEC") {
+                $create[] = array(
+                    "moduleID" => $decoderModuleID,
+                    "name" => ($web !== "") ? ("DEC " . $web) : ("DEC " . $ip),
+                    "configuration" => array(
+                        "Host" => $ip,
+                        "Port" => (int)$this->ReadPropertyInteger("Port"),
+                        "UseCRLF" => (bool)$this->ReadPropertyBoolean("UseCRLF"),
+                        "RegistryInstanceID" => $regID
+                    )
+                );
+            } else {
+                // UNKNOWN: aus Sicherheits-/Betriebsgründen keine Auto-Anlage
+            }
 
             $values[] = array(
                 "IP" => $ip,
+                "Role" => $role,
                 "WebName" => $web,
-                "EncoderInstanceID" => ($enc > 0) ? $enc : 0,
-                "DecoderInstanceID" => ($dec > 0) ? $dec : 0,
-                "create" => array(
-                    array(
-                        "moduleID" => $encoderModuleID,
-                        "name" => ($web !== "") ? ("ENC " . $web) : ("ENC " . $ip),
-                        "configuration" => array(
-                            "Host" => $ip,
-                            "Port" => (int)$this->ReadPropertyInteger("Port"),
-                            "UseCRLF" => (bool)$this->ReadPropertyBoolean("UseCRLF"),
-                            "RegistryInstanceID" => (int)$this->EnsureRegistry(),
-                            "SourceName" => $web,
-                            "AutoAssignFromSchema" => true,
-                            "VideoChannel" => 0,
-                            "AudioChannel" => 0,
-                            "USBChannel" => 0
-                        )
-                    ),
-                    array(
-                        "moduleID" => $decoderModuleID,
-                        "name" => ($web !== "") ? ("DEC " . $web) : ("DEC " . $ip),
-                        "configuration" => array(
-                            "Host" => $ip,
-                            "Port" => (int)$this->ReadPropertyInteger("Port"),
-                            "UseCRLF" => (bool)$this->ReadPropertyBoolean("UseCRLF"),
-                            "RegistryInstanceID" => (int)$this->EnsureRegistry()
-                        )
-                    )
-                )
+                "EncoderInstanceID" => ($encExisting > 0) ? $encExisting : 0,
+                "DecoderInstanceID" => ($decExisting > 0) ? $decExisting : 0,
+                "create" => $create
             );
         }
 
         return $values;
+    }
+
+    private function DetectRoleFromModelOutput($ModelOutput)
+    {
+        $t = strtoupper((string)$ModelOutput);
+
+        // robuste Heuristik
+        if (strpos($t, "TRANSMITTER") !== false || strpos($t, "ENCODER") !== false) return "ENC";
+        if (strpos($t, "RECEIVER") !== false || strpos($t, "DECODER") !== false) return "DEC";
+
+        // TX/RX Tokens
+        if (preg_match("/\bTX\b/", $t)) return "ENC";
+        if (preg_match("/\bRX\b/", $t)) return "DEC";
+
+        return "UNKNOWN";
     }
 
     private function ScanRange($FromIP, $ToIP, $Port, $ConnectTimeoutMs)
@@ -151,7 +200,7 @@ class JAPMaxColorConfigurator extends IPSModule
         return false;
     }
 
-    private function ReadWebNameViaTelnet($Host, $Port, $ConnectTimeoutMs, $ReadTimeoutMs, $UseCRLF)
+    private function TelnetExec($Host, $Port, $ConnectTimeoutMs, $ReadTimeoutMs, $UseCRLF, $Command)
     {
         $errno = 0;
         $errstr = "";
@@ -164,25 +213,29 @@ class JAPMaxColorConfigurator extends IPSModule
 
         stream_set_timeout($fp, 0, max(50000, ((int)$ReadTimeoutMs) * 1000));
 
+        // Banner
         @fread($fp, 2048);
 
-        $cmd = "astparam g webname" . ($UseCRLF ? "\r\n" : "\n");
+        $cmd = $Command . ($UseCRLF ? "\r\n" : "\n");
         @fwrite($fp, $cmd);
 
         $buf = "";
         $start = microtime(true);
-        while ((microtime(true) - $start) < (max(0.05, ((int)$ReadTimeoutMs) / 1000.0))) {
+        $maxSec = max(0.05, ((int)$ReadTimeoutMs) / 1000.0);
+
+        while ((microtime(true) - $start) < $maxSec) {
             $chunk = @fread($fp, 2048);
             if ($chunk === false || $chunk === "") {
                 break;
             }
             $buf .= $chunk;
-            if (strlen($buf) > 4096) break;
+            if (strlen($buf) > 8192) {
+                break;
+            }
         }
 
         fclose($fp);
-
-        return $this->ParseWebName($buf);
+        return $buf;
     }
 
     private function ParseWebName($Response)
@@ -201,9 +254,7 @@ class JAPMaxColorConfigurator extends IPSModule
                 }
             } else {
                 $candidate = trim($t, "\"'");
-                if ($candidate !== "" && strlen($candidate) < 128) {
-                    return $candidate;
-                }
+                if ($candidate !== "" && strlen($candidate) < 128) return $candidate;
             }
         }
         return "";
@@ -214,7 +265,9 @@ class JAPMaxColorConfigurator extends IPSModule
         $instances = IPS_GetInstanceListByModuleID($ModuleID);
         foreach ($instances as $id) {
             $host = (string)IPS_GetProperty($id, "Host");
-            if ($host === (string)$IP) return $id;
+            if ($host === (string)$IP) {
+                return $id;
+            }
         }
         return 0;
     }

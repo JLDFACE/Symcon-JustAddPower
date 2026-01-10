@@ -26,5 +26,17 @@ Service-Bereiche + fortlaufender Source-Index `n`:
 - **Encoder**: SourceName/WebName, Auto-Assign nach Schema, Apply Channels
 - **Decoder**: Video/Audio/USB getrennt, Audio folgt Video, USB folgt Video, Presets
 
+## Auto-Erkennung Encoder vs. Decoder (Configurator)
+
+Der Configurator führt beim Scan per Telnet u. a. `getmodel.sh` aus und leitet daraus die Rolle ab:
+
+- TX / Transmitter / Encoder => Gerät wird als Encoder angeboten
+- RX / Receiver / Decoder    => Gerät wird als Decoder angeboten
+- UNKNOWN                    => keine automatische Anlage (bewusst konservativ)
+
+Zusätzlich wird `astparam g webname` ausgelesen; bei Encoder-Instanzen wird empfohlen:
+WebName == SourceName (global eindeutig).
+
+
 ## SymBox-Hinweis
 Bei Problemen mit Modul-Caching: Repository ggf. entfernen und SymBox rebooten.
