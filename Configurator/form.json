@@ -9,6 +9,7 @@
   ],
   "actions": [
     { "type": "Button", "caption": "Scan starten", "onClick": "JAPMC_Scan($id);" },
+    { "type": "Button", "caption": "Ansicht aktualisieren", "onClick": "JAPMC_ReloadForm($id);" },
     {
       "type": "Configurator",
       "name": "DeviceList",

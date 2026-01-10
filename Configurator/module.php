@@ -57,10 +57,11 @@ class JAPMaxColorConfigurator extends IPSModule
 
         $found = array();
         foreach ($ips as $ip) {
+
             $modelOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "getmodel.sh");
             $model = strtoupper(trim((string)$this->ParseSingleLineValue($modelOut, "getmodel.sh")));
 
-            // Filter: nur echte MaxColor aufnehmen (verhindert "Phantom"-Geräte)
+            // Filter: nur echte MaxColor
             if ($model === "" || strpos($model, "MC-") !== 0) {
                 continue;
             }
@@ -70,7 +71,6 @@ class JAPMaxColorConfigurator extends IPSModule
             $webOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "astparam g webname");
             $web = $this->ParseValueFromAstparamGet($webOut, "astparam g webname");
 
-            // Debug raw, falls du nochmal prüfen willst:
             $this->SendDebug("JAPMC CFG", "RAW webname (" . $ip . ")=" . json_encode($webOut), 0);
 
             $found[] = array(
@@ -86,8 +86,15 @@ class JAPMaxColorConfigurator extends IPSModule
         IPS_LogMessage("JAPMC CFG", "Scan beendet, gefunden: " . count($found));
         $this->SendDebug("JAPMC CFG", "Discovered=" . json_encode($found), 0);
 
-        // WICHTIG: Liste sofort aktualisieren, ohne Form neu zu öffnen
-        $this->UpdateFormField("DeviceList", "values", json_encode($this->BuildValues()));
+        // KEIN UpdateFormField -> versionskompatibel
+        // Nutzer klickt "Ansicht aktualisieren" oder öffnet Form neu
+    }
+
+    // Nur um die Form sauber neu zu laden (Button)
+    public function ReloadForm()
+    {
+        // bewusst leer – das Aufrufen dieser Funktion reicht, damit die Konsole die Form neu abfragt
+        IPS_LogMessage("JAPMC CFG", "ReloadForm() requested");
     }
 
     private function BuildValues()
@@ -103,7 +110,6 @@ class JAPMaxColorConfigurator extends IPSModule
         $regID = (int)$this->EnsureRegistry();
 
         $values = array();
-
         foreach ($arr as $row) {
             $ip   = isset($row["IP"]) ? (string)$row["IP"] : "";
             $role = isset($row["Role"]) ? (string)$row["Role"] : "UNKNOWN";
@@ -111,12 +117,8 @@ class JAPMaxColorConfigurator extends IPSModule
             $modelRaw = isset($row["ModelRaw"]) ? (string)$row["ModelRaw"] : "";
             $override = isset($row["RoleOverride"]) ? (string)$row["RoleOverride"] : "";
 
-            // Override
-            if ($override === "ENC" || $override === "DEC") {
-                $role = $override;
-            } elseif ($override === "SKIP") {
-                $role = "UNKNOWN";
-            }
+            if ($override === "ENC" || $override === "DEC") $role = $override;
+            if ($override === "SKIP") $role = "UNKNOWN";
 
             $encExisting = $this->FindInstanceByHost($encoderModuleID, $ip);
             $decExisting = $this->FindInstanceByHost($decoderModuleID, $ip);
@@ -178,15 +180,8 @@ class JAPMaxColorConfigurator extends IPSModule
         $t = strtoupper(trim((string)$ModelOutput));
         if ($t === "") return "UNKNOWN";
 
-        // robust für viele Varianten
         if (preg_match('/\bMC-[A-Z0-9_-]*RX[A-Z0-9_-]*\b/', $t)) return "DEC";
         if (preg_match('/\bMC-[A-Z0-9_-]*TX[A-Z0-9_-]*\b/', $t)) return "ENC";
-
-        if (strpos($t, "RECEIVER") !== false || strpos($t, "DECODER") !== false) return "DEC";
-        if (strpos($t, "TRANSMITTER") !== false || strpos($t, "ENCODER") !== false) return "ENC";
-
-        if (preg_match('/\bRX\b/', $t)) return "DEC";
-        if (preg_match('/\bTX\b/', $t)) return "ENC";
 
         return "UNKNOWN";
     }
@@ -196,7 +191,6 @@ class JAPMaxColorConfigurator extends IPSModule
         $lines = $this->CleanTelnetLines($Response, $CommandEcho);
 
         foreach ($lines as $t) {
-            // key=value
             if (strpos($t, "=") !== false) {
                 $parts = explode("=", $t, 2);
                 $candidate = trim($parts[1]);
@@ -204,7 +198,6 @@ class JAPMaxColorConfigurator extends IPSModule
                 if ($this->IsPlausibleName($candidate)) return $candidate;
             }
 
-            // nur Wert
             $candidate = trim($t, "\"' \t");
             if ($this->IsPlausibleName($candidate)) return $candidate;
         }
@@ -224,7 +217,6 @@ class JAPMaxColorConfigurator extends IPSModule
     private function CleanTelnetLines($Response, $CommandEcho)
     {
         $echo = mb_strtolower(trim((string)$CommandEcho));
-
         $rawLines = preg_split("/\r\n|\n|\r/", (string)$Response);
         $out = array();
 
@@ -233,17 +225,15 @@ class JAPMaxColorConfigurator extends IPSModule
             if ($t === "") continue;
 
             $low = mb_strtolower($t);
-
-            // Echo entfernen
             if ($echo !== "" && ($low === $echo || strpos($low, $echo) !== false)) continue;
 
-            // Prompt hängt oft an derselben Zeile: abschneiden
+            // Prompt-Suffix abschneiden (kommt bei euch am selben String)
             $t = preg_replace("/\\s*\\/usr\\/local\\/bin\\s*#\\s*$/", "", $t);
             $t = preg_replace("/\\s*[>#\\$]\\s*$/", "", $t);
             $t = trim($t);
             if ($t === "") continue;
 
-            // Standalone prompt/noise entfernen
+            // Standalone prompt entfernen
             if (preg_match("/^\\/?usr\\/local\\/bin\\s*#$/", $t)) continue;
             if (preg_match("/^[>#\\$]$/", $t)) continue;
 
@@ -260,17 +250,12 @@ class JAPMaxColorConfigurator extends IPSModule
         if (strlen($n) > 80) return false;
 
         $low = mb_strtolower($n);
-
-        // Command/noise verwerfen (contains-basiert)
         if (strpos($low, "astparam") !== false) return false;
         if (strpos($low, "getmodel") !== false) return false;
         if (strpos($low, "channel") !== false) return false;
-
-        // Shell scripts
         if (substr($low, -3) === ".sh") return false;
 
         if (!preg_match("/^[A-Za-z0-9 _\\-\\.]+$/", $n)) return false;
-
         return true;
     }
 
@@ -278,7 +263,6 @@ class JAPMaxColorConfigurator extends IPSModule
     {
         $from = ip2long($FromIP);
         $to   = ip2long($ToIP);
-
         if ($from === false || $to === false) throw new Exception("Invalid IP range");
         if ($to < $from) { $tmp = $from; $from = $to; $to = $tmp; }
 
@@ -297,7 +281,6 @@ class JAPMaxColorConfigurator extends IPSModule
     {
         $errno = 0; $errstr = "";
         $timeoutSec = max(0.05, ((int)$ConnectTimeoutMs) / 1000.0);
-
         $fp = @fsockopen($Host, $Port, $errno, $errstr, $timeoutSec);
         if (is_resource($fp)) { fclose($fp); return true; }
         return false;
@@ -312,7 +295,6 @@ class JAPMaxColorConfigurator extends IPSModule
         if (!is_resource($fp)) return "";
 
         stream_set_timeout($fp, 0, max(50000, ((int)$ReadTimeoutMs) * 1000));
-
         @fread($fp, 2048);
 
         $cmd = $Command . ($UseCRLF ? "\r\n" : "\n");
