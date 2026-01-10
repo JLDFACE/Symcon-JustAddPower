@@ -99,6 +99,7 @@ class JAPMaxColorConfigurator extends IPSModule
                 "create" => []   // wichtig: darf leer sein
             ];
         }
+        $this->SendDebug("JAPMC CFG", "Discovered=" . json_encode($found), 0);
 
         $this->WriteAttributeString("Discovered", json_encode($found));
         IPS_LogMessage("JAPMC CFG", "Scan beendet, gefunden: " . count($found));
