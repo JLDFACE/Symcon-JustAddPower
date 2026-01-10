@@ -2,11 +2,14 @@
 
 class JAPMaxColorDecoderFlexible extends IPSModule
 {
+    // Simple TX DataID (Child -> Parent / Client Socket)
+    private $TX = "{79827379-F36E-4ADA-8A95-5F8D1DC92FA9}";
+
     public function Create()
     {
         parent::Create();
 
-        // Client Socket (I/O)
+        // Client Socket
         $this->RequireParent("{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}");
 
         $this->RegisterPropertyString("Host", "172.27.92.50");
@@ -47,7 +50,7 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $this->RegisterAttributeString("SelectedUSBName", "");
         $this->RegisterAttributeString("Initialized", "0");
 
-        // FIX: Timer-Script muss eval-fähiges PHP sein
+        // Timer: muss eval-fähiges PHP sein
         $this->RegisterTimer("RefreshTimer", 60000, 'JAPMC_RefreshSources($_IPS["TARGET"]);');
     }
 
@@ -55,21 +58,20 @@ class JAPMaxColorDecoderFlexible extends IPSModule
     {
         parent::ApplyChanges();
 
-        // Parent (Client Socket) konfigurieren
+        // Parent (Client Socket) konfigurieren (ConnectionID statt GetParentID())
         $inst = IPS_GetInstance($this->InstanceID);
-$parentID = isset($inst["ConnectionID"]) ? (int)$inst["ConnectionID"] : 0;
+        $parentID = isset($inst["ConnectionID"]) ? (int)$inst["ConnectionID"] : 0;
 
-if ($parentID > 0 && IPS_InstanceExists($parentID)) {
-    IPS_SetProperty($parentID, "Host", $this->ReadPropertyString("Host"));
-    IPS_SetProperty($parentID, "Port", $this->ReadPropertyInteger("Port"));
-    IPS_ApplyChanges($parentID);
-}
-
+        if ($parentID > 0 && IPS_InstanceExists($parentID)) {
+            IPS_SetProperty($parentID, "Host", $this->ReadPropertyString("Host"));
+            IPS_SetProperty($parentID, "Port", $this->ReadPropertyInteger("Port"));
+            IPS_ApplyChanges($parentID);
+        }
 
         // Defaults einmalig setzen
         if ($this->ReadAttributeString("Initialized") !== "1") {
-            SetValueBoolean($this->GetIDForIdent("AudioFollowsVideo"), $this->ReadPropertyBoolean("DefaultAudioFollowsVideo"));
-            SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), $this->ReadPropertyBoolean("DefaultUSBFollowsVideo"));
+            SetValueBoolean($this->GetIDForIdent("AudioFollowsVideo"), (bool)$this->ReadPropertyBoolean("DefaultAudioFollowsVideo"));
+            SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), (bool)$this->ReadPropertyBoolean("DefaultUSBFollowsVideo"));
             $this->WriteAttributeString("Initialized", "1");
         }
 
@@ -79,7 +81,7 @@ if ($parentID > 0 && IPS_InstanceExists($parentID)) {
 
     public function ReceiveData($JSONString)
     {
-        // SIMPLE: Buffer ist String (nicht base64)
+        // SIMPLE: Buffer ist Klartext
         $data = json_decode($JSONString, true);
         if (!is_array($data) || !isset($data["Buffer"])) {
             return;
@@ -272,21 +274,15 @@ if ($parentID > 0 && IPS_InstanceExists($parentID)) {
         });
 
         $vIdx = $this->FindSourceIndexByName($video);
-        if ($vIdx >= 0) {
-            SetValueInteger($this->GetIDForIdent("VideoSource"), $vIdx);
-        }
+        if ($vIdx >= 0) SetValueInteger($this->GetIDForIdent("VideoSource"), $vIdx);
 
         $aName = ($audio === "") ? $video : $audio;
         $aIdx = $this->FindSourceIndexByName($aName);
-        if ($aIdx >= 0) {
-            SetValueInteger($this->GetIDForIdent("AudioSource"), $aIdx);
-        }
+        if ($aIdx >= 0) SetValueInteger($this->GetIDForIdent("AudioSource"), $aIdx);
 
         $uName = ($usb === "") ? $video : $usb;
         $uIdx = $this->FindSourceIndexByName($uName);
-        if ($uIdx >= 0) {
-            SetValueInteger($this->GetIDForIdent("USBSource"), $uIdx);
-        }
+        if ($uIdx >= 0) SetValueInteger($this->GetIDForIdent("USBSource"), $uIdx);
     }
 
     // ---------------- Internals ----------------
@@ -313,12 +309,11 @@ if ($parentID > 0 && IPS_InstanceExists($parentID)) {
 
     private function SendCliCommand($Command)
     {
-        // SIMPLE: DataID + Buffer als Klartext
         $suffix  = $this->ReadPropertyBoolean("UseCRLF") ? "\r\n" : "\n";
         $payload = $Command . $suffix;
 
         $data = array(
-            "DataID" => "{79827379-F36E-4ADA-8A95-5F8D1DC92FA9}",
+            "DataID" => $this->TX,
             "Buffer" => $payload
         );
 
@@ -334,6 +329,7 @@ if ($parentID > 0 && IPS_InstanceExists($parentID)) {
         }
     }
 
+    // Registry JSON -> Array
     private function GetSourcesFromRegistry()
     {
         $regID = (int)$this->ReadPropertyInteger("RegistryInstanceID");
@@ -341,20 +337,36 @@ if ($parentID > 0 && IPS_InstanceExists($parentID)) {
             return array();
         }
 
-        $arr = @JAPMC_RegistryGetSources($regID);
+        $json = @JAPMC_RegistryGetSources($regID);
+        if (!is_string($json) || $json === "") {
+            return array();
+        }
+
+        $arr = json_decode($json, true);
         if (!is_array($arr)) {
             return array();
         }
         return $arr;
     }
 
+    // Registry JSON -> Array (single object)
     private function ResolveSource($Name)
     {
         $regID = (int)$this->ReadPropertyInteger("RegistryInstanceID");
         if ($regID <= 0 || !IPS_InstanceExists($regID)) {
             return null;
         }
-        return @JAPMC_RegistryResolveSource($regID, (string)$Name);
+
+        $json = @JAPMC_RegistryResolveSource($regID, (string)$Name);
+        if (!is_string($json) || $json === "") {
+            return null;
+        }
+
+        $obj = json_decode($json, true);
+        if (!is_array($obj)) {
+            return null;
+        }
+        return $obj;
     }
 
     private function GetPresets()
@@ -423,21 +435,15 @@ if ($parentID > 0 && IPS_InstanceExists($parentID)) {
 
         if ($vName !== "") {
             $idx = $this->FindSourceIndexByName($vName);
-            if ($idx >= 0) {
-                SetValueInteger($this->GetIDForIdent("VideoSource"), $idx);
-            }
+            if ($idx >= 0) SetValueInteger($this->GetIDForIdent("VideoSource"), $idx);
         }
         if ($aName !== "") {
             $idx = $this->FindSourceIndexByName($aName);
-            if ($idx >= 0) {
-                SetValueInteger($this->GetIDForIdent("AudioSource"), $idx);
-            }
+            if ($idx >= 0) SetValueInteger($this->GetIDForIdent("AudioSource"), $idx);
         }
         if ($uName !== "") {
             $idx = $this->FindSourceIndexByName($uName);
-            if ($idx >= 0) {
-                SetValueInteger($this->GetIDForIdent("USBSource"), $idx);
-            }
+            if ($idx >= 0) SetValueInteger($this->GetIDForIdent("USBSource"), $idx);
         }
     }
 
