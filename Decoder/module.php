@@ -155,7 +155,7 @@ class JAPMaxColorDecoderFlexible extends IPSModule
                 if ($name === "") throw new Exception("Invalid USBSource selection");
 
                 $this->SwitchServiceBySourceName("u", $name);
-                $this->WriteAttributeString("SelectedUSBName"), $name;
+                $this->WriteAttributeString("SelectedUSBName", $name);
             });
 
             SetValueInteger($this->GetIDForIdent("USBSource"), $idx);
