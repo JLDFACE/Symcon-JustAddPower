@@ -56,23 +56,23 @@ class JAPMaxColorConfigurator extends IPSModule
         $ips = $this->ScanRange($from, $to, $port, $cTimeout);
 
         $found = array();
-        foreach ($ips as $ip) {
 
+        foreach ($ips as $ip) {
             $modelOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "getmodel.sh");
 
-// Extrahiere z.B. "MC-RX1" oder "MC-TX2" aus beliebiger Ausgabe (Prompt/Echo/Mehrzeiler)
-$modelToken = $this->ExtractModelToken($modelOut);
+            // Extrahiere "MC-RX1", "MC-TX2", ... aus beliebiger Ausgabe
+            $modelToken = $this->ExtractModelToken($modelOut);
 
-// Debug in Meldungen (sichtbar ohne Debug-Fenster)
-IPS_LogMessage("JAPMC CFG", "Probe " . $ip . " getmodel.sh raw=" . $this->OneLine($modelOut) . " token=" . $modelToken);
+            // Debug in Meldungen (sichtbar ohne Debug-Fenster)
+            IPS_LogMessage("JAPMC CFG", "Probe " . $ip . " getmodel.sh raw=" . $this->OneLine($modelOut) . " token=" . $modelToken);
 
-if ($modelToken === "") {
-    continue; // kein MaxColor gefunden
-}
+            if ($modelToken === "") {
+                continue; // kein MaxColor gefunden
+            }
 
-$role = $this->DetectRoleFromModelOutput($modelToken);
+            $role = $this->DetectRoleFromModelOutput($modelToken);
 
-            // 4) WebName holen (kann je nach Firmware "webname=..." oder nur der Wert sein)
+            // WebName holen (kann "webname=..." oder nur der Wert sein)
             $webOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "astparam g webname");
             $web = $this->ParseWebName($webOut);
 
@@ -80,16 +80,15 @@ $role = $this->DetectRoleFromModelOutput($modelToken);
                 "IP" => $ip,
                 "Role" => $role,
                 "WebName" => $web,
-                "ModelRaw" => $model,
+                "ModelRaw" => $modelToken,
                 "RoleOverride" => ""
             );
         }
 
         $this->WriteAttributeString("Discovered", json_encode($found));
         IPS_LogMessage("JAPMC CFG", "Discovered=" . $this->OneLine(json_encode($found)));
-
-
         IPS_LogMessage("JAPMC CFG", "Scan beendet, gefunden: " . count($found));
+
         $this->SendDebug("JAPMC CFG", "Discovered=" . json_encode($found), 0);
     }
 
@@ -187,7 +186,6 @@ $role = $this->DetectRoleFromModelOutput($modelToken);
         $t = strtoupper(trim((string)$ModelOutput));
         if ($t === "") return "UNKNOWN";
 
-        // Robust für viele Varianten: MC-RX1, MC-TX2, MC-RX0589C9, MC-TX00ABCD, ...
         if (preg_match('/\bMC-[A-Z0-9_-]*RX[A-Z0-9_-]*\b/', $t)) return "DEC";
         if (preg_match('/\bMC-[A-Z0-9_-]*TX[A-Z0-9_-]*\b/', $t)) return "ENC";
 
@@ -228,23 +226,22 @@ $role = $this->DetectRoleFromModelOutput($modelToken);
     }
 
     private function ExtractModelToken($ModelOutput)
-{
-    $t = strtoupper((string)$ModelOutput);
+    {
+        $t = strtoupper((string)$ModelOutput);
 
-    // sucht "MC-..." irgendwo in der Ausgabe und nimmt das erste passende Token
-    if (preg_match('/\bMC-[A-Z0-9_-]+\b/', $t, $m)) {
-        return trim($m[0]);
+        if (preg_match('/\bMC-[A-Z0-9_-]+\b/', $t, $m)) {
+            return trim($m[0]);
+        }
+        return "";
     }
-    return "";
-}
 
-private function OneLine($Text)
-{
-    $s = trim((string)$Text);
-    $s = preg_replace("/\s+/", " ", $s);
-    if (strlen($s) > 160) $s = substr($s, 0, 160) . "...";
-    return $s;
-}
+    private function OneLine($Text)
+    {
+        $s = trim((string)$Text);
+        $s = preg_replace("/\s+/", " ", $s);
+        if (strlen($s) > 160) $s = substr($s, 0, 160) . "...";
+        return $s;
+    }
 
     private function TestTcp($Host, $Port, $ConnectTimeoutMs)
     {
@@ -271,7 +268,6 @@ private function OneLine($Text)
 
         stream_set_timeout($fp, 0, max(50000, ((int)$ReadTimeoutMs) * 1000));
 
-        // Banner/Prompt "weglesen"
         @fread($fp, 2048);
 
         $cmd = $Command . ($UseCRLF ? "\r\n" : "\n");
@@ -308,10 +304,10 @@ private function OneLine($Text)
                     $candidate = trim($candidate, "\"' \t");
                     if ($this->IsPlausibleName($candidate)) return $candidate;
                 }
-            }ƒ
+            }
         }
 
-        // 2) fallback: nur der Wert (typisch bei "astparam g webname")
+        // 2) fallback: nur der Wert
         foreach ($lines as $l) {
             $t = trim($l);
             if ($this->IsPlausibleName($t)) return $t;
