@@ -5,6 +5,7 @@ class JAPMaxColorConfigurator extends IPSModule
     public function Create()
     {
         parent::Create();
+        $this->RegisterPropertyInteger("RefreshNonce", 0);
 
         $this->RegisterPropertyString("ScanFrom", "192.168.10.1");
         $this->RegisterPropertyString("ScanTo", "192.168.10.254");
@@ -16,6 +17,14 @@ class JAPMaxColorConfigurator extends IPSModule
 
         $this->RegisterAttributeString("Discovered", "[]");
     }
+    public function SoftRefresh()
+    {
+    $n = (int)$this->ReadPropertyInteger("RefreshNonce");
+    $n++;
+    IPS_SetProperty($this->InstanceID, "RefreshNonce", $n);
+    IPS_ApplyChanges($this->InstanceID);
+    }
+
 
     public function ApplyChanges()
     {
