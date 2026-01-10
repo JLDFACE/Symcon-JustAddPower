@@ -48,6 +48,7 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $this->RegisterAttributeString("SelectedUSBName", "");
         $this->RegisterAttributeString("Initialized", "0");
 
+        // Timer-Kontext hat $_IPS["TARGET"] – das ist hier korrekt
         $this->RegisterTimer("RefreshTimer", 60000, 'JAPMC_RefreshSources($_IPS["TARGET"]);');
     }
 
@@ -163,8 +164,10 @@ class JAPMaxColorDecoderFlexible extends IPSModule
                     $this->WithLock(function () use ($vidName) {
                         $this->SwitchServiceBySourceName("a", $vidName);
                     });
+
                     $idx = $this->FindSourceIndexByName($vidName);
                     if ($idx >= 0) SetValueInteger($this->GetIDForIdent("AudioSource"), $idx);
+
                     $this->WriteAttributeString("SelectedAudioName", $vidName);
                 }
             }
@@ -181,8 +184,10 @@ class JAPMaxColorDecoderFlexible extends IPSModule
                     $this->WithLock(function () use ($vidName) {
                         $this->SwitchServiceBySourceName("u", $vidName);
                     });
+
                     $idx = $this->FindSourceIndexByName($vidName);
                     if ($idx >= 0) SetValueInteger($this->GetIDForIdent("USBSource"), $idx);
+
                     $this->WriteAttributeString("SelectedUSBName", $vidName);
                 }
             }
@@ -210,57 +215,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $this->RestoreSelections($sources);
 
         $this->WriteAttributeString("ProfileHash", $hash);
-    }
-
-    public function ApplySelectedPreset()
-    {
-        $presets = $this->GetPresets();
-        $pIdx = (int)GetValueInteger($this->GetIDForIdent("Preset"));
-
-        if (!isset($presets[$pIdx])) throw new Exception("Invalid preset selection");
-
-        $p = $presets[$pIdx];
-        $video = isset($p["VideoSource"]) ? trim((string)$p["VideoSource"]) : "";
-        $audio = isset($p["AudioSource"]) ? trim((string)$p["AudioSource"]) : "";
-        $usb   = isset($p["USBSource"]) ? trim((string)$p["USBSource"]) : "";
-
-        if ($video === "") throw new Exception("Preset has empty VideoSource");
-
-        $this->WithLock(function () use ($video, $audio, $usb) {
-            $this->SwitchServiceBySourceName("v", $video);
-            $this->WriteAttributeString("SelectedVideoName", $video);
-
-            if ($audio === "") {
-                SetValueBoolean($this->GetIDForIdent("AudioFollowsVideo"), true);
-                $this->SwitchServiceBySourceName("a", $video);
-                $this->WriteAttributeString("SelectedAudioName", $video);
-            } else {
-                SetValueBoolean($this->GetIDForIdent("AudioFollowsVideo"), false);
-                $this->SwitchServiceBySourceName("a", $audio);
-                $this->WriteAttributeString("SelectedAudioName", $audio);
-            }
-
-            if ($usb === "") {
-                SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), true);
-                $this->SwitchServiceBySourceName("u", $video);
-                $this->WriteAttributeString("SelectedUSBName", $video);
-            } else {
-                SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), false);
-                $this->SwitchServiceBySourceName("u", $usb);
-                $this->WriteAttributeString("SelectedUSBName", $usb);
-            }
-        });
-
-        $vIdx = $this->FindSourceIndexByName($video);
-        if ($vIdx >= 0) SetValueInteger($this->GetIDForIdent("VideoSource"), $vIdx);
-
-        $aName = ($audio === "") ? $video : $audio;
-        $aIdx = $this->FindSourceIndexByName($aName);
-        if ($aIdx >= 0) SetValueInteger($this->GetIDForIdent("AudioSource"), $aIdx);
-
-        $uName = ($usb === "") ? $video : $usb;
-        $uIdx = $this->FindSourceIndexByName($uName);
-        if ($uIdx >= 0) SetValueInteger($this->GetIDForIdent("USBSource"), $uIdx);
     }
 
     private function SwitchServiceBySourceName($Service, $SourceName)
@@ -422,7 +376,6 @@ class JAPMaxColorDecoderFlexible extends IPSModule
     {
         $key = "JAPMC_DEC_" . $this->InstanceID;
         if (!IPS_SemaphoreEnter($key, 5000)) throw new Exception("Device busy (semaphore timeout)");
-
         try {
             call_user_func($Callable);
         } finally {

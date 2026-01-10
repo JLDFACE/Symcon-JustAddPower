@@ -59,17 +59,6 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         }
     }
 
-    public function ReadWebName()
-    {
-        $resp = $this->SendCliCommandAndBestEffortRead("astparam g webname");
-        $name = $this->ParseWebName($resp);
-
-        if ($name !== "") {
-            IPS_SetProperty($this->InstanceID, "SourceName", $name);
-            IPS_ApplyChanges($this->InstanceID);
-        }
-    }
-
     public function ApplyChannels()
     {
         $v = (int)$this->ReadPropertyInteger("VideoChannel");
@@ -114,49 +103,15 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $suffix  = $this->ReadPropertyBoolean("UseCRLF") ? "\r\n" : "\n";
         $payload = $Command . $suffix;
 
-        $data = array(
-            "DataID" => $this->TX,
-            "Buffer" => $payload
-        );
-
+        $data = array("DataID" => $this->TX, "Buffer" => $payload);
         $this->SendDataToParent(json_encode($data));
         $this->SendDebug("JAPMC ENC TX", $Command, 0);
-    }
-
-    private function SendCliCommandAndBestEffortRead($Command)
-    {
-        $this->WithLock(function () use ($Command) {
-            $this->SendCliCommand($Command);
-        });
-
-        IPS_Sleep(250);
-        return (string)GetValueString($this->GetIDForIdent("LastResponse"));
-    }
-
-    private function ParseWebName($Response)
-    {
-        $lines = preg_split("/\r\n|\n|\r/", (string)$Response);
-        foreach ($lines as $l) {
-            $t = trim($l);
-            if ($t === "") continue;
-
-            if (stripos($t, "webname") !== false) {
-                $parts = preg_split("/=|:/", $t);
-                if (is_array($parts) && count($parts) >= 2) {
-                    $candidate = trim($parts[count($parts) - 1]);
-                    $candidate = trim($candidate, "\"' \t");
-                    if ($candidate !== "") return $candidate;
-                }
-            }
-        }
-        return "";
     }
 
     private function WithLock($Callable)
     {
         $key = "JAPMC_ENC_" . $this->InstanceID;
         if (!IPS_SemaphoreEnter($key, 5000)) throw new Exception("Device busy (semaphore timeout)");
-
         try {
             call_user_func($Callable);
         } finally {

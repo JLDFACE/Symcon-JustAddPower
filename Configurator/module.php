@@ -30,7 +30,6 @@ class JAPMaxColorConfigurator extends IPSModule
             $form = array("elements" => array(), "actions" => array());
         }
 
-        // DeviceList values setzen
         if (isset($form["actions"]) && is_array($form["actions"])) {
             foreach ($form["actions"] as $k => $a) {
                 if (isset($a["type"]) && $a["type"] === "Configurator" && isset($a["name"]) && $a["name"] === "DeviceList") {
@@ -58,9 +57,20 @@ class JAPMaxColorConfigurator extends IPSModule
 
         $found = array();
         foreach ($ips as $ip) {
-            $modelOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "getmodel.sh");
-            $role = $this->DetectRoleFromModelOutput($modelOut);
 
+            // 1) Model holen
+            $modelOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "getmodel.sh");
+            $model = strtoupper(trim((string)$modelOut));
+
+            // 2) Filter: Nur echte MaxColor aufnehmen (verhindert "Phantom"-Geräte)
+            if ($model === "" || strpos($model, "MC-") !== 0) {
+                continue;
+            }
+
+            // 3) Role erkennen
+            $role = $this->DetectRoleFromModelOutput($model);
+
+            // 4) WebName holen (kann je nach Firmware "webname=..." oder nur der Wert sein)
             $webOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "astparam g webname");
             $web = $this->ParseWebName($webOut);
 
@@ -68,12 +78,13 @@ class JAPMaxColorConfigurator extends IPSModule
                 "IP" => $ip,
                 "Role" => $role,
                 "WebName" => $web,
-                "ModelRaw" => trim((string)$modelOut),
+                "ModelRaw" => $model,
                 "RoleOverride" => ""
             );
         }
 
         $this->WriteAttributeString("Discovered", json_encode($found));
+
         IPS_LogMessage("JAPMC CFG", "Scan beendet, gefunden: " . count($found));
         $this->SendDebug("JAPMC CFG", "Discovered=" . json_encode($found), 0);
     }
@@ -82,17 +93,16 @@ class JAPMaxColorConfigurator extends IPSModule
     {
         $raw = $this->ReadAttributeString("Discovered");
         $arr = json_decode($raw, true);
-        if (!is_array($arr)) {
-            $arr = array();
-        }
+        if (!is_array($arr)) $arr = array();
 
-        // GUIDs müssen zu module.json passen
+        // GUIDs müssen zu euren module.json passen:
         $encoderModuleID = "{4E0C3C4A-0C7E-4A44-9B6B-5E1C6F4A2A20}";
         $decoderModuleID = "{6D3F1D0A-7D4B-4C1C-9A1A-2B7C0E1D3F20}";
 
         $regID = (int)$this->EnsureRegistry();
 
         $values = array();
+
         foreach ($arr as $row) {
             $ip   = isset($row["IP"]) ? (string)$row["IP"] : "";
             $role = isset($row["Role"]) ? (string)$row["Role"] : "UNKNOWN";
@@ -100,27 +110,40 @@ class JAPMaxColorConfigurator extends IPSModule
             $modelRaw = isset($row["ModelRaw"]) ? (string)$row["ModelRaw"] : "";
             $override = isset($row["RoleOverride"]) ? (string)$row["RoleOverride"] : "";
 
+            // Sanity WebName
+            $low = mb_strtolower(trim($web));
+            if ($low === "getmodel.sh" || $low === "getmodel" || $low === "astparam" || $low === "channel") $web = "";
+
             // Override auswerten
             if ($override === "ENC" || $override === "DEC") {
                 $role = $override;
-            }
-            if ($override === "SKIP") {
+            } elseif ($override === "SKIP") {
                 $role = "UNKNOWN";
-            }
-
-            // Sanity: WebName darf nie wie ein Kommando aussehen
-            $low = mb_strtolower(trim($web));
-            if ($low === "getmodel.sh" || $low === "getmodel" || $low === "astparam" || $low === "channel") {
-                $web = "";
             }
 
             $encExisting = $this->FindInstanceByHost($encoderModuleID, $ip);
             $decExisting = $this->FindInstanceByHost($decoderModuleID, $ip);
 
-            $create = array();
-            if ($override !== "SKIP") {
+            // instanceID setzen, falls bereits vorhanden
+            $instanceID = 0;
+            if ($role === "ENC" && $encExisting > 0) $instanceID = $encExisting;
+            if ($role === "DEC" && $decExisting > 0) $instanceID = $decExisting;
+
+            $rowOut = array(
+                "IP" => $ip,
+                "Role" => $role,
+                "WebName" => $web,
+                "ModelRaw" => $modelRaw,
+                "EncoderInstanceID" => ($encExisting > 0) ? $encExisting : 0,
+                "DecoderInstanceID" => ($decExisting > 0) ? $decExisting : 0,
+                "RoleOverride" => $override,
+                "instanceID" => $instanceID
+            );
+
+            // create nur anbieten, wenn keine Instanz existiert (und nicht SKIP)
+            if ($instanceID == 0 && $override !== "SKIP") {
                 if ($role === "ENC") {
-                    $create[] = array(
+                    $rowOut["create"] = array(
                         "moduleID" => $encoderModuleID,
                         "name" => ($web !== "") ? ("ENC " . $web) : ("ENC " . $ip),
                         "configuration" => array(
@@ -136,7 +159,7 @@ class JAPMaxColorConfigurator extends IPSModule
                         )
                     );
                 } elseif ($role === "DEC") {
-                    $create[] = array(
+                    $rowOut["create"] = array(
                         "moduleID" => $decoderModuleID,
                         "name" => ($web !== "") ? ("DEC " . $web) : ("DEC " . $ip),
                         "configuration" => array(
@@ -149,16 +172,7 @@ class JAPMaxColorConfigurator extends IPSModule
                 }
             }
 
-            $values[] = array(
-                "IP" => $ip,
-                "Role" => $role,
-                "WebName" => $web,
-                "ModelRaw" => $modelRaw,
-                "EncoderInstanceID" => ($encExisting > 0) ? $encExisting : 0,
-                "DecoderInstanceID" => ($decExisting > 0) ? $decExisting : 0,
-                "RoleOverride" => $override,
-                "create" => $create
-            );
+            $values[] = $rowOut;
         }
 
         return $values;
@@ -167,16 +181,17 @@ class JAPMaxColorConfigurator extends IPSModule
     private function DetectRoleFromModelOutput($ModelOutput)
     {
         $t = strtoupper(trim((string)$ModelOutput));
+        if ($t === "") return "UNKNOWN";
 
-        // MaxColor typisch: MC-RX1 / MC-TX1
-        if (preg_match('/\bMC-RX\b/', $t) || preg_match('/\bMC-RX[0-9A-Z]*\b/', $t)) return "DEC";
-        if (preg_match('/\bMC-TX\b/', $t) || preg_match('/\bMC-TX[0-9A-Z]*\b/', $t)) return "ENC";
+        // Robust für viele Varianten: MC-RX1, MC-TX2, MC-RX0589C9, MC-TX00ABCD, ...
+        if (preg_match('/\bMC-[A-Z0-9_-]*RX[A-Z0-9_-]*\b/', $t)) return "DEC";
+        if (preg_match('/\bMC-[A-Z0-9_-]*TX[A-Z0-9_-]*\b/', $t)) return "ENC";
 
-        if (strpos($t, "TRANSMITTER") !== false || strpos($t, "ENCODER") !== false) return "ENC";
         if (strpos($t, "RECEIVER") !== false || strpos($t, "DECODER") !== false) return "DEC";
+        if (strpos($t, "TRANSMITTER") !== false || strpos($t, "ENCODER") !== false) return "ENC";
 
-        if (preg_match('/\bTX\b/', $t)) return "ENC";
         if (preg_match('/\bRX\b/', $t)) return "DEC";
+        if (preg_match('/\bTX\b/', $t)) return "ENC";
 
         return "UNKNOWN";
     }
@@ -229,13 +244,11 @@ class JAPMaxColorConfigurator extends IPSModule
         $timeoutSec = max(0.05, ((int)$ConnectTimeoutMs) / 1000.0);
 
         $fp = @fsockopen($Host, $Port, $errno, $errstr, $timeoutSec);
-        if (!is_resource($fp)) {
-            return "";
-        }
+        if (!is_resource($fp)) return "";
 
         stream_set_timeout($fp, 0, max(50000, ((int)$ReadTimeoutMs) * 1000));
 
-        // Banner/Prompt
+        // Banner/Prompt "weglesen"
         @fread($fp, 2048);
 
         $cmd = $Command . ($UseCRLF ? "\r\n" : "\n");
@@ -247,13 +260,9 @@ class JAPMaxColorConfigurator extends IPSModule
 
         while ((microtime(true) - $start) < $maxSec) {
             $chunk = @fread($fp, 2048);
-            if ($chunk === false || $chunk === "") {
-                break;
-            }
+            if ($chunk === false || $chunk === "") break;
             $buf .= $chunk;
-            if (strlen($buf) > 8192) {
-                break;
-            }
+            if (strlen($buf) > 8192) break;
         }
 
         fclose($fp);
@@ -263,6 +272,8 @@ class JAPMaxColorConfigurator extends IPSModule
     private function ParseWebName($Response)
     {
         $lines = preg_split("/\r\n|\n|\r/", (string)$Response);
+
+        // 1) bevorzugt "webname=..." Zeile
         foreach ($lines as $l) {
             $t = trim($l);
             if ($t === "") continue;
@@ -272,12 +283,17 @@ class JAPMaxColorConfigurator extends IPSModule
                 if (is_array($parts) && count($parts) >= 2) {
                     $candidate = trim($parts[count($parts) - 1]);
                     $candidate = trim($candidate, "\"' \t");
-                    if ($this->IsPlausibleName($candidate)) {
-                        return $candidate;
-                    }
+                    if ($this->IsPlausibleName($candidate)) return $candidate;
                 }
             }
         }
+
+        // 2) fallback: nur der Wert (typisch bei "astparam g webname")
+        foreach ($lines as $l) {
+            $t = trim($l);
+            if ($this->IsPlausibleName($t)) return $t;
+        }
+
         return "";
     }
 
@@ -300,9 +316,7 @@ class JAPMaxColorConfigurator extends IPSModule
         $instances = IPS_GetInstanceListByModuleID($ModuleID);
         foreach ($instances as $id) {
             $host = (string)IPS_GetProperty($id, "Host");
-            if ($host === (string)$IP) {
-                return $id;
-            }
+            if ($host === (string)$IP) return $id;
         }
         return 0;
     }
@@ -311,9 +325,7 @@ class JAPMaxColorConfigurator extends IPSModule
     {
         $registryModuleID = "{8C9C2A0F-9D2B-4E1A-8E1F-7A2B7A0C1E10}";
         $instances = IPS_GetInstanceListByModuleID($registryModuleID);
-        if (count($instances) > 0) {
-            return (int)$instances[0];
-        }
+        if (count($instances) > 0) return (int)$instances[0];
 
         $id = IPS_CreateInstance($registryModuleID);
         IPS_SetName($id, "JAP Source Registry");

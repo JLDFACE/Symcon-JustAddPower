@@ -27,7 +27,7 @@ class JAPMaxColorSourceRegistry extends IPSModule
         $allowDup = (bool)$this->ReadPropertyBoolean("AllowDuplicateChannels");
         $sources  = $this->BuildSourcesFromEncoders();
 
-        $errors   = array();
+        $errors = array();
         $seenNames = array();
         $seenV = array();
         $seenA = array();
@@ -59,18 +59,13 @@ class JAPMaxColorSourceRegistry extends IPSModule
                 if (isset($seenV[$v])) $errors[] = "Duplicate Video channel: " . $v . " (" . $name . ")";
                 if (isset($seenA[$a])) $errors[] = "Duplicate Audio channel: " . $a . " (" . $name . ")";
                 if (isset($seenU[$u])) $errors[] = "Duplicate USB channel: " . $u . " (" . $name . ")";
-
                 $seenV[$v] = true;
                 $seenA[$a] = true;
                 $seenU[$u] = true;
             }
         }
 
-        $payload = array(
-            "timestamp" => time(),
-            "errors"    => $errors,
-            "count"     => count($sources)
-        );
+        $payload = array("timestamp" => time(), "errors" => $errors, "count" => count($sources));
         $this->WriteAttributeString("LastValidation", json_encode($payload));
 
         if (count($errors) > 0) {

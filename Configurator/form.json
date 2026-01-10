@@ -1,15 +1,7 @@
 {
   "elements": [
-    {
-      "type": "ValidationTextBox",
-      "name": "ScanFrom",
-      "caption": "Scan von IP"
-    },
-    {
-      "type": "ValidationTextBox",
-      "name": "ScanTo",
-      "caption": "Scan bis IP"
-    },
+    { "type": "ValidationTextBox", "name": "ScanFrom", "caption": "Scan von IP" },
+    { "type": "ValidationTextBox", "name": "ScanTo", "caption": "Scan bis IP" },
     {
       "type": "NumberSpinner",
       "name": "Port",
@@ -31,18 +23,10 @@
       "minimum": 100,
       "maximum": 5000
     },
-    {
-      "type": "CheckBox",
-      "name": "UseCRLF",
-      "caption": "CRLF verwenden (\\r\\n)"
-    }
+    { "type": "CheckBox", "name": "UseCRLF", "caption": "CRLF verwenden (\\r\\n)" }
   ],
   "actions": [
-    {
-      "type": "Button",
-      "caption": "Scan starten",
-      "onClick": "JAPMC_Scan($id);"
-    },
+    { "type": "Button", "caption": "Scan starten", "onClick": "JAPMC_Scan($id);" },
     {
       "type": "Configurator",
       "name": "DeviceList",
