@@ -179,6 +179,26 @@ class JAPMaxColorConfigurator extends IPSModule
         return $values;
     }
 
+    private function ParseValueFromAstparamGet($Response, $CommandEcho)
+{
+    $lines = $this->CleanTelnetLines($Response, $CommandEcho);
+
+    foreach ($lines as $t) {
+        if (strpos($t, "=") !== false) {
+            $parts = explode("=", $t, 2);
+            $candidate = trim($parts[1]);
+            $candidate = trim($candidate, "\"' \t");
+            if ($this->IsPlausibleName($candidate)) return $candidate;
+        }
+
+        $candidate = trim($t, "\"' \t");
+        if ($this->IsPlausibleName($candidate)) return $candidate;
+    }
+
+    return "";
+}
+
+
     private function DetectRoleFromModelOutput($ModelOutput)
     {
         $t = strtoupper(trim((string)$ModelOutput));
@@ -304,33 +324,42 @@ class JAPMaxColorConfigurator extends IPSModule
     }
 
     private function CleanTelnetLines($Response, $CommandEcho)
-    {
-        $echo = mb_strtolower(trim((string)$CommandEcho));
+{
+    $echo = mb_strtolower(trim((string)$CommandEcho));
 
-        $rawLines = preg_split("/\r\n|\n|\r/", (string)$Response);
-        $out = array();
+    $rawLines = preg_split("/\r\n|\n|\r/", (string)$Response);
+    $out = array();
 
-        foreach ($rawLines as $l) {
-            $t = trim($l);
-            if ($t === "") continue;
+    foreach ($rawLines as $l) {
+        $t = trim($l);
+        if ($t === "") continue;
 
-            $low = mb_strtolower($t);
+        $low = mb_strtolower($t);
 
-            // Echo der eingegebenen Commands entfernen (exakt oder enthalten)
-            if ($echo !== "" && ($low === $echo || strpos($low, $echo) !== false)) continue;
+        // Echo der eingegebenen Commands entfernen (exakt oder enthalten)
+        if ($echo !== "" && ($low === $echo || strpos($low, $echo) !== false)) continue;
 
-            // generischen Prompt/Noise entfernen (konservativ)
-            if (preg_match("/^[>#\\$]$/", $t)) continue;
-            if (preg_match("/^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+.*[%#\\$]$/", $t)) continue;
+        // Wenn Prompt an derselben Zeile hängt: abschneiden
+        // typische Prompts: "/usr/local/bin #", "#", "$", ">"
+        $t = preg_replace("/\\s*\\/usr\\/local\\/bin\\s*#\\s*$/", "", $t);
+        $t = preg_replace("/\\s*[>#\\$]\\s*$/", "", $t);
 
-            // häufige "usages:" Zeilen o.ä. ignorieren
-            if (strpos($low, "usages:") === 0) continue;
+        $t = trim($t);
+        if ($t === "") continue;
 
-            $out[] = $t;
-        }
+        // Standalone Prompt-Zeilen entfernen
+        if (preg_match("/^\\/?usr\\/local\\/bin\\s*#$/", $t)) continue;
+        if (preg_match("/^[>#\\$]$/", $t)) continue;
 
-        return $out;
+        // sehr generisch: user@host ...# (optional)
+        if (preg_match("/^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+.*[%#\\$]$/", $t)) continue;
+
+        $out[] = $t;
     }
+
+    return $out;
+}
+
 
     private function IsPlausibleName($Name)
     {
