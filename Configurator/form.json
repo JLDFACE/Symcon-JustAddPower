@@ -39,19 +39,18 @@
   ],
   "actions": [
     {
-  "type": "Button",
-  "caption": "Scan starten",
-  "onClick": "JAPMC_Scan($_IPS[\"TARGET\"]);"
-}
-
+      "type": "Button",
+      "caption": "Scan starten",
+      "onClick": "JAPMC_Scan($_IPS[\"TARGET\"]);"
+    },
     {
       "type": "Configurator",
       "name": "DeviceList",
       "caption": "Gefundene Geräte",
       "columns": [
-        { "label": "IP", "name": "IP", "width": "170px" },
+        { "label": "IP", "name": "IP", "width": "150px" },
         { "label": "Role", "name": "Role", "width": "80px" },
-        { "label": "WebName", "name": "WebName", "width": "220px" },
+        { "label": "WebName", "name": "WebName", "width": "250px" },
         { "label": "EncoderID", "name": "EncoderInstanceID", "width": "90px" },
         { "label": "DecoderID", "name": "DecoderInstanceID", "width": "90px" }
       ],
