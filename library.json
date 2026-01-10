@@ -1,13 +1,9 @@
 {
-  "id": "{B7E8C2D1-9F1B-4F12-AF3A-9B1E6D9F0EAA}",
-  "author": "JLDFACE",
-  "name": "JustAddPower MaxColor",
+  "id": "{0F7E3D3C-8D86-4D2B-8F43-8E5F7D2C3B10}",
+  "author": "FACE",
+  "name": "Symcon-JustAddPower",
   "url": "https://github.com/JLDFACE/Symcon-JustAddPower",
   "version": "1.0",
-  "modules": [
-    "Configurator",
-    "Registry",
-    "Encoder",
-    "Decoder"
-  ]
+  "build": 1,
+  "date": 1767398400
 }
