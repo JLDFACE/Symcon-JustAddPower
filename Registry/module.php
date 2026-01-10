@@ -76,13 +76,11 @@ class JAPMaxColorSourceRegistry extends IPSModule
         }
     }
 
-    // PHPLibrary-konform: string
     public function RegistryGetSources()
     {
         return json_encode($this->BuildSourcesFromEncoders());
     }
 
-    // PHPLibrary-konform: string
     public function RegistryResolveSource($SourceName)
     {
         $nameKey = mb_strtolower((string)$SourceName);
@@ -97,7 +95,6 @@ class JAPMaxColorSourceRegistry extends IPSModule
         return json_encode(null);
     }
 
-    // PHPLibrary-konform: int
     public function RegistryGetNextFreeIndex()
     {
         $videoBase = (int)$this->ReadPropertyInteger("VideoBase");

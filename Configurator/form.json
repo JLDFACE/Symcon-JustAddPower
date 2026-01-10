@@ -2,27 +2,9 @@
   "elements": [
     { "type": "ValidationTextBox", "name": "ScanFrom", "caption": "Scan von IP" },
     { "type": "ValidationTextBox", "name": "ScanTo", "caption": "Scan bis IP" },
-    {
-      "type": "NumberSpinner",
-      "name": "Port",
-      "caption": "Port (Telnet)",
-      "minimum": 1,
-      "maximum": 65535
-    },
-    {
-      "type": "NumberSpinner",
-      "name": "ConnectTimeoutMs",
-      "caption": "Connect Timeout (ms)",
-      "minimum": 50,
-      "maximum": 5000
-    },
-    {
-      "type": "NumberSpinner",
-      "name": "ReadTimeoutMs",
-      "caption": "Read Timeout (ms)",
-      "minimum": 100,
-      "maximum": 5000
-    },
+    { "type": "NumberSpinner", "name": "Port", "caption": "Port (Telnet)", "minimum": 1, "maximum": 65535 },
+    { "type": "NumberSpinner", "name": "ConnectTimeoutMs", "caption": "Connect Timeout (ms)", "minimum": 50, "maximum": 5000 },
+    { "type": "NumberSpinner", "name": "ReadTimeoutMs", "caption": "Read Timeout (ms)", "minimum": 100, "maximum": 5000 },
     { "type": "CheckBox", "name": "UseCRLF", "caption": "CRLF verwenden (\\r\\n)" }
   ],
   "actions": [

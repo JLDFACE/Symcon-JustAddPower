@@ -11,7 +11,7 @@ class JAPMaxColorConfigurator extends IPSModule
         $this->RegisterPropertyInteger("Port", 23);
 
         $this->RegisterPropertyInteger("ConnectTimeoutMs", 250);
-        $this->RegisterPropertyInteger("ReadTimeoutMs", 600);
+        $this->RegisterPropertyInteger("ReadTimeoutMs", 800);
         $this->RegisterPropertyBoolean("UseCRLF", true);
 
         $this->RegisterAttributeString("Discovered", "[]");
@@ -57,21 +57,21 @@ class JAPMaxColorConfigurator extends IPSModule
 
         $found = array();
         foreach ($ips as $ip) {
-
-            // Model holen
             $modelOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "getmodel.sh");
             $model = strtoupper(trim((string)$this->ParseSingleLineValue($modelOut, "getmodel.sh")));
 
-            // Nur echte MaxColor aufnehmen
+            // Filter: nur echte MaxColor aufnehmen (verhindert "Phantom"-Geräte)
             if ($model === "" || strpos($model, "MC-") !== 0) {
                 continue;
             }
 
             $role = $this->DetectRoleFromModelOutput($model);
 
-            // Webname holen (Echo/Prompt-bereinigt)
             $webOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "astparam g webname");
             $web = $this->ParseValueFromAstparamGet($webOut, "astparam g webname");
+
+            // Debug raw, falls du nochmal prüfen willst:
+            $this->SendDebug("JAPMC CFG", "RAW webname (" . $ip . ")=" . json_encode($webOut), 0);
 
             $found[] = array(
                 "IP" => $ip,
@@ -80,15 +80,14 @@ class JAPMaxColorConfigurator extends IPSModule
                 "ModelRaw" => $model,
                 "RoleOverride" => ""
             );
-
-            // Optionales Debug (bei Bedarf aktivieren)
-            // $this->SendDebug("JAPMC CFG", "RAW webname (" . $ip . ")=" . json_encode($webOut), 0);
         }
 
         $this->WriteAttributeString("Discovered", json_encode($found));
-
         IPS_LogMessage("JAPMC CFG", "Scan beendet, gefunden: " . count($found));
         $this->SendDebug("JAPMC CFG", "Discovered=" . json_encode($found), 0);
+
+        // WICHTIG: Liste sofort aktualisieren, ohne Form neu zu öffnen
+        $this->UpdateFormField("DeviceList", "values", json_encode($this->BuildValues()));
     }
 
     private function BuildValues()
@@ -97,10 +96,11 @@ class JAPMaxColorConfigurator extends IPSModule
         $arr = json_decode($raw, true);
         if (!is_array($arr)) $arr = array();
 
-        // GUIDs müssen zu euren module.json passen:
+        // GUIDs müssen zu euren module.json passen
         $encoderModuleID = "{4E0C3C4A-0C7E-4A44-9B6B-5E1C6F4A2A20}";
         $decoderModuleID = "{6D3F1D0A-7D4B-4C1C-9A1A-2B7C0E1D3F20}";
-        $registryID = (int)$this->EnsureRegistry();
+
+        $regID = (int)$this->EnsureRegistry();
 
         $values = array();
 
@@ -111,7 +111,7 @@ class JAPMaxColorConfigurator extends IPSModule
             $modelRaw = isset($row["ModelRaw"]) ? (string)$row["ModelRaw"] : "";
             $override = isset($row["RoleOverride"]) ? (string)$row["RoleOverride"] : "";
 
-            // Override auswerten
+            // Override
             if ($override === "ENC" || $override === "DEC") {
                 $role = $override;
             } elseif ($override === "SKIP") {
@@ -136,9 +136,7 @@ class JAPMaxColorConfigurator extends IPSModule
                 "instanceID" => $instanceID
             );
 
-            // create nur anbieten, wenn keine Instanz existiert
             if ($instanceID == 0 && $override !== "SKIP") {
-
                 if ($role === "ENC") {
                     $rowOut["create"] = array(
                         "moduleID" => $encoderModuleID,
@@ -146,10 +144,8 @@ class JAPMaxColorConfigurator extends IPSModule
                         "configuration" => array(
                             "Host" => $ip,
                             "Port" => (int)$this->ReadPropertyInteger("Port"),
-                            // WICHTIG: Client Socket automatisch öffnen
-                            "Open" => true,
                             "UseCRLF" => (bool)$this->ReadPropertyBoolean("UseCRLF"),
-                            "RegistryInstanceID" => $registryID,
+                            "RegistryInstanceID" => $regID,
                             "SourceName" => $web,
                             "AutoAssignFromSchema" => true,
                             "VideoChannel" => 0,
@@ -164,10 +160,8 @@ class JAPMaxColorConfigurator extends IPSModule
                         "configuration" => array(
                             "Host" => $ip,
                             "Port" => (int)$this->ReadPropertyInteger("Port"),
-                            // WICHTIG: Client Socket automatisch öffnen
-                            "Open" => true,
                             "UseCRLF" => (bool)$this->ReadPropertyBoolean("UseCRLF"),
-                            "RegistryInstanceID" => $registryID
+                            "RegistryInstanceID" => $regID
                         )
                     );
                 }
@@ -184,7 +178,7 @@ class JAPMaxColorConfigurator extends IPSModule
         $t = strtoupper(trim((string)$ModelOutput));
         if ($t === "") return "UNKNOWN";
 
-        // Robust: MC-RX1, MC-TX2, MC-RX0589C9, MC-TX00ABCD, ...
+        // robust für viele Varianten
         if (preg_match('/\bMC-[A-Z0-9_-]*RX[A-Z0-9_-]*\b/', $t)) return "DEC";
         if (preg_match('/\bMC-[A-Z0-9_-]*TX[A-Z0-9_-]*\b/', $t)) return "ENC";
 
@@ -197,84 +191,12 @@ class JAPMaxColorConfigurator extends IPSModule
         return "UNKNOWN";
     }
 
-    private function ScanRange($FromIP, $ToIP, $Port, $ConnectTimeoutMs)
-    {
-        $from = ip2long($FromIP);
-        $to   = ip2long($ToIP);
-
-        if ($from === false || $to === false) {
-            throw new Exception("Invalid IP range");
-        }
-        if ($to < $from) {
-            $tmp = $from; $from = $to; $to = $tmp;
-        }
-
-        $max = 512;
-        if (($to - $from + 1) > $max) {
-            throw new Exception("Scan range too large (max " . $max . " IPs)");
-        }
-
-        $found = array();
-        for ($i = $from; $i <= $to; $i++) {
-            $ip = long2ip($i);
-            if ($this->TestTcp($ip, $Port, $ConnectTimeoutMs)) {
-                $found[] = $ip;
-            }
-        }
-        return $found;
-    }
-
-    private function TestTcp($Host, $Port, $ConnectTimeoutMs)
-    {
-        $errno = 0;
-        $errstr = "";
-        $timeoutSec = max(0.05, ((int)$ConnectTimeoutMs) / 1000.0);
-
-        $fp = @fsockopen($Host, $Port, $errno, $errstr, $timeoutSec);
-        if (is_resource($fp)) {
-            fclose($fp);
-            return true;
-        }
-        return false;
-    }
-
-    private function TelnetExec($Host, $Port, $ConnectTimeoutMs, $ReadTimeoutMs, $UseCRLF, $Command)
-    {
-        $errno = 0;
-        $errstr = "";
-        $timeoutSec = max(0.05, ((int)$ConnectTimeoutMs) / 1000.0);
-
-        $fp = @fsockopen($Host, $Port, $errno, $errstr, $timeoutSec);
-        if (!is_resource($fp)) return "";
-
-        stream_set_timeout($fp, 0, max(50000, ((int)$ReadTimeoutMs) * 1000));
-
-        // Banner/Prompt weglesen
-        @fread($fp, 2048);
-
-        $cmd = $Command . ($UseCRLF ? "\r\n" : "\n");
-        @fwrite($fp, $cmd);
-
-        $buf = "";
-        $start = microtime(true);
-        $maxSec = max(0.05, ((int)$ReadTimeoutMs) / 1000.0);
-
-        while ((microtime(true) - $start) < $maxSec) {
-            $chunk = @fread($fp, 2048);
-            if ($chunk === false || $chunk === "") break;
-            $buf .= $chunk;
-            if (strlen($buf) > 16384) break;
-        }
-
-        fclose($fp);
-        return $buf;
-    }
-
     private function ParseValueFromAstparamGet($Response, $CommandEcho)
     {
         $lines = $this->CleanTelnetLines($Response, $CommandEcho);
 
         foreach ($lines as $t) {
+            // key=value
             if (strpos($t, "=") !== false) {
                 $parts = explode("=", $t, 2);
                 $candidate = trim($parts[1]);
@@ -282,6 +204,7 @@ class JAPMaxColorConfigurator extends IPSModule
                 if ($this->IsPlausibleName($candidate)) return $candidate;
             }
 
+            // nur Wert
             $candidate = trim($t, "\"' \t");
             if ($this->IsPlausibleName($candidate)) return $candidate;
         }
@@ -293,8 +216,7 @@ class JAPMaxColorConfigurator extends IPSModule
     {
         $lines = $this->CleanTelnetLines($Response, $CommandEcho);
         foreach ($lines as $t) {
-            $t = trim($t);
-            if ($t !== "" && strlen($t) <= 120) return $t;
+            if ($t !== "" && strlen($t) <= 80) return $t;
         }
         return "";
     }
@@ -312,22 +234,18 @@ class JAPMaxColorConfigurator extends IPSModule
 
             $low = mb_strtolower($t);
 
-            // Echo entfernen (exakt oder enthalten)
+            // Echo entfernen
             if ($echo !== "" && ($low === $echo || strpos($low, $echo) !== false)) continue;
 
-            // Prompt an derselben Zeile abschneiden
+            // Prompt hängt oft an derselben Zeile: abschneiden
             $t = preg_replace("/\\s*\\/usr\\/local\\/bin\\s*#\\s*$/", "", $t);
             $t = preg_replace("/\\s*[>#\\$]\\s*$/", "", $t);
-
             $t = trim($t);
             if ($t === "") continue;
 
-            // Standalone Prompts entfernen
+            // Standalone prompt/noise entfernen
             if (preg_match("/^\\/?usr\\/local\\/bin\\s*#$/", $t)) continue;
             if (preg_match("/^[>#\\$]$/", $t)) continue;
-
-            // user@host... prompt (konservativ)
-            if (preg_match("/^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+.*[%#\\$]$/", $t)) continue;
 
             $out[] = $t;
         }
@@ -343,14 +261,76 @@ class JAPMaxColorConfigurator extends IPSModule
 
         $low = mb_strtolower($n);
 
+        // Command/noise verwerfen (contains-basiert)
         if (strpos($low, "astparam") !== false) return false;
         if (strpos($low, "getmodel") !== false) return false;
         if (strpos($low, "channel") !== false) return false;
+
+        // Shell scripts
         if (substr($low, -3) === ".sh") return false;
 
         if (!preg_match("/^[A-Za-z0-9 _\\-\\.]+$/", $n)) return false;
 
         return true;
+    }
+
+    private function ScanRange($FromIP, $ToIP, $Port, $ConnectTimeoutMs)
+    {
+        $from = ip2long($FromIP);
+        $to   = ip2long($ToIP);
+
+        if ($from === false || $to === false) throw new Exception("Invalid IP range");
+        if ($to < $from) { $tmp = $from; $from = $to; $to = $tmp; }
+
+        $max = 512;
+        if (($to - $from + 1) > $max) throw new Exception("Scan range too large (max " . $max . " IPs)");
+
+        $found = array();
+        for ($i = $from; $i <= $to; $i++) {
+            $ip = long2ip($i);
+            if ($this->TestTcp($ip, $Port, $ConnectTimeoutMs)) $found[] = $ip;
+        }
+        return $found;
+    }
+
+    private function TestTcp($Host, $Port, $ConnectTimeoutMs)
+    {
+        $errno = 0; $errstr = "";
+        $timeoutSec = max(0.05, ((int)$ConnectTimeoutMs) / 1000.0);
+
+        $fp = @fsockopen($Host, $Port, $errno, $errstr, $timeoutSec);
+        if (is_resource($fp)) { fclose($fp); return true; }
+        return false;
+    }
+
+    private function TelnetExec($Host, $Port, $ConnectTimeoutMs, $ReadTimeoutMs, $UseCRLF, $Command)
+    {
+        $errno = 0; $errstr = "";
+        $timeoutSec = max(0.05, ((int)$ConnectTimeoutMs) / 1000.0);
+
+        $fp = @fsockopen($Host, $Port, $errno, $errstr, $timeoutSec);
+        if (!is_resource($fp)) return "";
+
+        stream_set_timeout($fp, 0, max(50000, ((int)$ReadTimeoutMs) * 1000));
+
+        @fread($fp, 2048);
+
+        $cmd = $Command . ($UseCRLF ? "\r\n" : "\n");
+        @fwrite($fp, $cmd);
+
+        $buf = "";
+        $start = microtime(true);
+        $maxSec = max(0.05, ((int)$ReadTimeoutMs) / 1000.0);
+
+        while ((microtime(true) - $start) < $maxSec) {
+            $chunk = @fread($fp, 2048);
+            if ($chunk === false || $chunk === "") break;
+            $buf .= $chunk;
+            if (strlen($buf) > 8192) break;
+        }
+
+        fclose($fp);
+        return $buf;
     }
 
     private function FindInstanceByHost($ModuleID, $IP)

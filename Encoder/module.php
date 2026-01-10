@@ -8,7 +8,6 @@ class JAPMaxColorEncoderFlexible extends IPSModule
     {
         parent::Create();
 
-        // Client Socket
         $this->RequireParent("{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}");
 
         $this->RegisterPropertyString("Host", "192.168.10.50");
@@ -32,15 +31,28 @@ class JAPMaxColorEncoderFlexible extends IPSModule
     {
         parent::ApplyChanges();
 
+        $host = (string)$this->ReadPropertyString("Host");
+        $port = (int)$this->ReadPropertyInteger("Port");
+
+        // Parent (Client Socket) konfigurieren
         $inst = IPS_GetInstance($this->InstanceID);
         $parentID = isset($inst["ConnectionID"]) ? (int)$inst["ConnectionID"] : 0;
 
-        // Parent konfigurieren + automatisch öffnen
         if ($parentID > 0 && IPS_InstanceExists($parentID)) {
-            IPS_SetProperty($parentID, "Host", $this->ReadPropertyString("Host"));
-            IPS_SetProperty($parentID, "Port", $this->ReadPropertyInteger("Port"));
-            IPS_SetProperty($parentID, "Open", true);
-            IPS_ApplyChanges($parentID);
+            IPS_SetProperty($parentID, "Host", $host);
+            IPS_SetProperty($parentID, "Port", $port);
+
+            // Auto-Open nur wenn erreichbar
+            if ($this->HasParentOpenProperty($parentID)) {
+                $canConnect = $this->TestTcp($host, $port, 250);
+                IPS_SetProperty($parentID, "Open", $canConnect);
+                $this->SendDebug("JAPMC ENC", "AutoOpen=" . ($canConnect ? "true" : "false") . " for " . $host . ":" . $port, 0);
+            }
+
+            // Warnings beim ApplyChanges des Parents abfangen
+            $this->CallSilenced(function () use ($parentID) {
+                IPS_ApplyChanges($parentID);
+            });
         }
 
         if ($this->ReadPropertyBoolean("AutoAssignFromSchema")) {
@@ -85,7 +97,6 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $v = (int)$this->ReadPropertyInteger("VideoChannel");
         $a = (int)$this->ReadPropertyInteger("AudioChannel");
         $u = (int)$this->ReadPropertyInteger("USBChannel");
-
         if ($v != 0 || $a != 0 || $u != 0) return;
 
         $n = (int)@JAPMC_RegistryGetNextFreeIndex($regID);
@@ -120,5 +131,35 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         } finally {
             IPS_SemaphoreLeave($key);
         }
+    }
+
+    private function TestTcp($Host, $Port, $ConnectTimeoutMs)
+    {
+        $errno = 0; $errstr = "";
+        $timeoutSec = max(0.05, ((int)$ConnectTimeoutMs) / 1000.0);
+
+        $fp = @fsockopen($Host, $Port, $errno, $errstr, $timeoutSec);
+        if (is_resource($fp)) { fclose($fp); return true; }
+        return false;
+    }
+
+    private function CallSilenced($Callable)
+    {
+        $old = set_error_handler(function () { return true; });
+        try {
+            call_user_func($Callable);
+        } finally {
+            if ($old !== null) {
+                set_error_handler($old);
+            } else {
+                restore_error_handler();
+            }
+        }
+    }
+
+    private function HasParentOpenProperty($InstanceID)
+    {
+        $props = IPS_GetPropertyList($InstanceID);
+        return is_array($props) && in_array("Open", $props);
     }
 }
