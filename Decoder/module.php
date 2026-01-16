@@ -113,12 +113,24 @@ class JAPMaxColorDecoderFlexible extends IPSModule
     public function RequestAction($Ident, $Value)
     {
         if ($Ident == "VideoSource") {
+            $regID = (int)$this->ReadPropertyInteger("RegistryInstanceID");
+            if ($regID <= 0 || !IPS_InstanceExists($regID)) {
+                echo "Keine Registry-Instanz konfiguriert.\n";
+                echo "Bitte wählen Sie eine gültige Registry-Instanz in der Konfiguration.";
+                return;
+            }
+
             $idx = (int)$Value;
+            $name = $this->GetSourceNameByIndex($idx);
 
-            $this->WithLock(function () use ($idx) {
-                $name = $this->GetSourceNameByIndex($idx);
-                if ($name === "") throw new Exception("Invalid VideoSource selection");
+            if ($name === "") {
+                echo "Ungültige Video-Quelle ausgewählt.\n";
+                echo "Index: " . $idx . "\n\n";
+                echo "Bitte aktualisieren Sie die Quellenliste in der Registry oder warten Sie auf die automatische Aktualisierung.";
+                return;
+            }
 
+            $this->WithLock(function () use ($idx, $name) {
                 $this->SwitchServiceBySourceName("v", $name);
                 $this->WriteAttributeString("SelectedVideoName", $name);
 
@@ -140,12 +152,24 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         }
 
         if ($Ident == "AudioSource") {
+            $regID = (int)$this->ReadPropertyInteger("RegistryInstanceID");
+            if ($regID <= 0 || !IPS_InstanceExists($regID)) {
+                echo "Keine Registry-Instanz konfiguriert.\n";
+                echo "Bitte wählen Sie eine gültige Registry-Instanz in der Konfiguration.";
+                return;
+            }
+
             $idx = (int)$Value;
+            $name = $this->GetSourceNameByIndex($idx);
 
-            $this->WithLock(function () use ($idx) {
-                $name = $this->GetSourceNameByIndex($idx);
-                if ($name === "") throw new Exception("Invalid AudioSource selection");
+            if ($name === "") {
+                echo "Ungültige Audio-Quelle ausgewählt.\n";
+                echo "Index: " . $idx . "\n\n";
+                echo "Bitte aktualisieren Sie die Quellenliste in der Registry oder warten Sie auf die automatische Aktualisierung.";
+                return;
+            }
 
+            $this->WithLock(function () use ($name) {
                 $this->SwitchServiceBySourceName("a", $name);
                 $this->WriteAttributeString("SelectedAudioName", $name);
             });
@@ -159,12 +183,24 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         }
 
         if ($Ident == "USBSource") {
+            $regID = (int)$this->ReadPropertyInteger("RegistryInstanceID");
+            if ($regID <= 0 || !IPS_InstanceExists($regID)) {
+                echo "Keine Registry-Instanz konfiguriert.\n";
+                echo "Bitte wählen Sie eine gültige Registry-Instanz in der Konfiguration.";
+                return;
+            }
+
             $idx = (int)$Value;
+            $name = $this->GetSourceNameByIndex($idx);
 
-            $this->WithLock(function () use ($idx) {
-                $name = $this->GetSourceNameByIndex($idx);
-                if ($name === "") throw new Exception("Invalid USBSource selection");
+            if ($name === "") {
+                echo "Ungültige USB-Quelle ausgewählt.\n";
+                echo "Index: " . $idx . "\n\n";
+                echo "Bitte aktualisieren Sie die Quellenliste in der Registry oder warten Sie auf die automatische Aktualisierung.";
+                return;
+            }
 
+            $this->WithLock(function () use ($name) {
                 $this->SwitchServiceBySourceName("u", $name);
                 $this->WriteAttributeString("SelectedUSBName", $name);
             });
@@ -236,15 +272,22 @@ class JAPMaxColorDecoderFlexible extends IPSModule
     private function SwitchServiceBySourceName($Service, $SourceName)
     {
         $src = $this->ResolveSource($SourceName);
-        if (!is_array($src)) throw new Exception("Source not found in registry: " . $SourceName);
+        if (!is_array($src)) {
+            echo "Quelle nicht in Registry gefunden: " . $SourceName . "\n";
+            echo "Bitte überprüfen Sie die Registry-Konfiguration.";
+            return;
+        }
 
         $ch = 0;
-        if ($Service == "v") $ch = (int)$src["Video"];
-        if ($Service == "a") $ch = (int)$src["Audio"];
-        if ($Service == "u") $ch = (int)$src["USB"];
+        if ($Service == "v") $ch = isset($src["Video"]) ? (int)$src["Video"] : 0;
+        if ($Service == "a") $ch = isset($src["Audio"]) ? (int)$src["Audio"] : 0;
+        if ($Service == "u") $ch = isset($src["USB"]) ? (int)$src["USB"] : 0;
 
         if ($ch <= 0) {
-            throw new Exception("Invalid channel for service " . $Service . ": " . $ch);
+            $serviceName = ($Service == "v" ? "Video" : ($Service == "a" ? "Audio" : "USB"));
+            echo "Ungültiger " . $serviceName . "-Kanal für Quelle '" . $SourceName . "': " . $ch . "\n";
+            echo "Bitte konfigurieren Sie einen gültigen Kanal in der Registry.";
+            return;
         }
 
         $this->SendCliCommand("channel -" . $Service . " " . $ch);
