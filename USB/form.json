@@ -34,8 +34,8 @@
       "name": "USBMode",
       "caption": "USB Modus",
       "options": [
-        { "caption": "USB Host (sendet USB)", "value": "HOST" },
-        { "caption": "USB Client (empfängt USB)", "value": "CLIENT" }
+        { "caption": "USB Host (empfängt USB am MC-2)", "value": "HOST" },
+        { "caption": "USB Client (sendet USB an Enc/Dec)", "value": "CLIENT" }
       ]
     },
     {

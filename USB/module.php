@@ -106,7 +106,7 @@ class JAPMaxColorUSBDevice extends IPSModule
             if ($mode !== "CLIENT") {
                 echo "USB-Quellenwahl ist nur im USB Client-Modus verfügbar.\n";
                 echo "Aktueller Modus: USB Host\n\n";
-                echo "Bitte ändern Sie den USB Modus auf 'USB Client (empfängt USB)' um Quellen zu wählen.";
+                echo "Bitte ändern Sie den USB Modus auf 'USB Client (sendet USB an Enc/Dec)' um Quellen zu wählen.";
                 return;
             }
 
@@ -168,7 +168,7 @@ class JAPMaxColorUSBDevice extends IPSModule
         if ($mode !== "HOST") {
             echo "Diese Funktion ist nur im USB Host-Modus verfügbar.\n";
             echo "Aktueller Modus: USB Client\n\n";
-            echo "Bitte ändern Sie den USB Modus auf 'USB Host (sendet USB)' um USB-Kanäle zu konfigurieren.";
+            echo "Bitte ändern Sie den USB Modus auf 'USB Host (empfängt USB am MC-2)' um USB-Kanäle zu konfigurieren.";
             return;
         }
 
