@@ -18,9 +18,10 @@
       "columns": [
         { "label": "IP", "name": "IP", "width": "150px" },
         { "label": "Role", "name": "Role", "width": "80px" },
-        { "label": "WebName", "name": "WebName", "width": "250px" },
-        { "label": "EncoderID", "name": "EncoderInstanceID", "width": "90px" },
-        { "label": "DecoderID", "name": "DecoderInstanceID", "width": "90px" },
+        { "label": "WebName", "name": "WebName", "width": "200px" },
+        { "label": "EncoderID", "name": "EncoderInstanceID", "width": "80px" },
+        { "label": "DecoderID", "name": "DecoderInstanceID", "width": "80px" },
+        { "label": "USB-ID", "name": "USBInstanceID", "width": "80px" },
         {
           "label": "Manual",
           "name": "RoleOverride",
@@ -31,6 +32,7 @@
               { "label": "Auto", "value": "" },
               { "label": "Encoder", "value": "ENC" },
               { "label": "Decoder", "value": "DEC" },
+              { "label": "USB", "value": "USB" },
               { "label": "Skip", "value": "SKIP" }
             ]
           }

@@ -1,0 +1,101 @@
+{
+  "elements": [
+    {
+      "type": "Label",
+      "caption": "JAP MaxColor USB Device - sendet oder empfängt USB-Signale"
+    },
+    {
+      "type": "ValidationTextBox",
+      "name": "Host",
+      "caption": "Host (IP)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "Port",
+      "caption": "Port",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    {
+      "type": "CheckBox",
+      "name": "UseCRLF",
+      "caption": "Use CRLF (\\r\\n)"
+    },
+    {
+      "type": "Label",
+      "caption": " "
+    },
+    {
+      "type": "Label",
+      "caption": "USB Routing"
+    },
+    {
+      "type": "Select",
+      "name": "USBMode",
+      "caption": "USB Modus",
+      "options": [
+        { "caption": "USB Sender (wie Encoder)", "value": "SENDER" },
+        { "caption": "USB Empfänger (wie Decoder)", "value": "RECEIVER" }
+      ]
+    },
+    {
+      "type": "Label",
+      "caption": " "
+    },
+    {
+      "type": "Label",
+      "caption": "USB Sender Konfiguration (nur wenn Modus = Sender)"
+    },
+    {
+      "type": "SelectInstance",
+      "name": "RegistryInstanceID",
+      "caption": "Registry Instanz",
+      "validModules": ["{2E8D5F6A-3C4B-4D1E-9A2B-1C5F8E7D3A40}"]
+    },
+    {
+      "type": "ValidationTextBox",
+      "name": "SourceName",
+      "caption": "Quellname (für Registry)"
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "USBChannel",
+      "caption": "USB Kanal",
+      "minimum": 0,
+      "maximum": 9999
+    },
+    {
+      "type": "CheckBox",
+      "name": "AutoAssignFromSchema",
+      "caption": "Automatische Kanal-Zuweisung"
+    },
+    {
+      "type": "Label",
+      "caption": " "
+    },
+    {
+      "type": "Label",
+      "caption": "USB Empfänger Konfiguration (nur wenn Modus = Empfänger)"
+    },
+    {
+      "type": "SelectInstance",
+      "name": "RegistryInstanceIDReceiver",
+      "caption": "Registry Instanz",
+      "validModules": ["{2E8D5F6A-3C4B-4D1E-9A2B-1C5F8E7D3A40}"]
+    },
+    {
+      "type": "NumberSpinner",
+      "name": "CommandDelayMs",
+      "caption": "Verzögerung zwischen Befehlen (ms)",
+      "minimum": 0,
+      "maximum": 5000
+    }
+  ],
+  "actions": [
+    {
+      "type": "Button",
+      "caption": "USB Kanal anwenden (nur Sender)",
+      "onClick": "JAPMC_ApplyUSBChannel($id);"
+    }
+  ]
+}

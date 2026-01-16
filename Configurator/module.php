@@ -115,6 +115,7 @@ class JAPMaxColorConfigurator extends IPSModule
         // GUIDs müssen zu euren module.json passen
         $encoderModuleID = "{4E0C3C4A-0C7E-4A44-9B6B-5E1C6F4A2A20}";
         $decoderModuleID = "{6D3F1D0A-7D4B-4C1C-9A1A-2B7C0E1D3F20}";
+        $usbModuleID = "{8F2E4D5A-9C1B-4E2F-8A3D-1E5C7F9B2D40}";
 
         $regID = (int)$this->EnsureRegistry();
 
@@ -126,15 +127,17 @@ class JAPMaxColorConfigurator extends IPSModule
             $modelRaw = isset($row["ModelRaw"]) ? (string)$row["ModelRaw"] : "";
             $override = isset($row["RoleOverride"]) ? (string)$row["RoleOverride"] : "";
 
-            if ($override === "ENC" || $override === "DEC") $role = $override;
+            if ($override === "ENC" || $override === "DEC" || $override === "USB") $role = $override;
             if ($override === "SKIP") $role = "UNKNOWN";
 
             $encExisting = $this->FindInstanceByHost($encoderModuleID, $ip);
             $decExisting = $this->FindInstanceByHost($decoderModuleID, $ip);
+            $usbExisting = $this->FindInstanceByHost($usbModuleID, $ip);
 
             $instanceID = 0;
             if ($role === "ENC" && $encExisting > 0) $instanceID = $encExisting;
             if ($role === "DEC" && $decExisting > 0) $instanceID = $decExisting;
+            if ($role === "USB" && $usbExisting > 0) $instanceID = $usbExisting;
 
             $rowOut = array(
                 "IP" => $ip,
@@ -143,6 +146,7 @@ class JAPMaxColorConfigurator extends IPSModule
                 "ModelRaw" => $modelRaw,
                 "EncoderInstanceID" => ($encExisting > 0) ? $encExisting : 0,
                 "DecoderInstanceID" => ($decExisting > 0) ? $decExisting : 0,
+                "USBInstanceID" => ($usbExisting > 0) ? $usbExisting : 0,
                 "RoleOverride" => $override,
                 "instanceID" => $instanceID
             );
@@ -175,6 +179,23 @@ class JAPMaxColorConfigurator extends IPSModule
                             "RegistryInstanceID" => $regID
                         )
                     );
+                } elseif ($role === "USB") {
+                    $rowOut["create"] = array(
+                        "moduleID" => $usbModuleID,
+                        "name" => ($web !== "") ? ("USB " . $web) : ("USB " . $ip),
+                        "configuration" => array(
+                            "Host" => $ip,
+                            "Port" => (int)$this->ReadPropertyInteger("Port"),
+                            "UseCRLF" => (bool)$this->ReadPropertyBoolean("UseCRLF"),
+                            "USBMode" => "RECEIVER",
+                            "RegistryInstanceID" => $regID,
+                            "RegistryInstanceIDReceiver" => $regID,
+                            "SourceName" => $web,
+                            "AutoAssignFromSchema" => true,
+                            "USBChannel" => 0,
+                            "CommandDelayMs" => 100
+                        )
+                    );
                 }
             }
 
@@ -189,6 +210,10 @@ class JAPMaxColorConfigurator extends IPSModule
         $t = strtoupper(trim((string)$ModelOutput));
         if ($t === "") return "UNKNOWN";
 
+        // USB-Geräte erkennen (MC-USB)
+        if (preg_match('/\bMC-USB[A-Z0-9_-]*\b/', $t)) return "USB";
+
+        // Standard Decoder/Encoder
         if (preg_match('/\bMC-[A-Z0-9_-]*RX[A-Z0-9_-]*\b/', $t)) return "DEC";
         if (preg_match('/\bMC-[A-Z0-9_-]*TX[A-Z0-9_-]*\b/', $t)) return "ENC";
 
