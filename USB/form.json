@@ -34,8 +34,8 @@
       "name": "USBMode",
       "caption": "USB Modus",
       "options": [
-        { "caption": "USB Sender (wie Encoder)", "value": "SENDER" },
-        { "caption": "USB Empfänger (wie Decoder)", "value": "RECEIVER" }
+        { "caption": "USB Host (sendet USB)", "value": "HOST" },
+        { "caption": "USB Client (empfängt USB)", "value": "CLIENT" }
       ]
     },
     {
@@ -44,7 +44,7 @@
     },
     {
       "type": "Label",
-      "caption": "USB Sender Konfiguration (nur wenn Modus = Sender)"
+      "caption": "USB Host Konfiguration (nur wenn Modus = Host)"
     },
     {
       "type": "SelectInstance",
@@ -75,7 +75,7 @@
     },
     {
       "type": "Label",
-      "caption": "USB Empfänger Konfiguration (nur wenn Modus = Empfänger)"
+      "caption": "USB Client Konfiguration (nur wenn Modus = Client)"
     },
     {
       "type": "SelectInstance",
@@ -94,7 +94,7 @@
   "actions": [
     {
       "type": "Button",
-      "caption": "USB Kanal anwenden (nur Sender)",
+      "caption": "USB Kanal anwenden (nur Host)",
       "onClick": "JAPMC_ApplyUSBChannel($id);"
     }
   ]

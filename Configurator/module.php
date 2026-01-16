@@ -187,7 +187,7 @@ class JAPMaxColorConfigurator extends IPSModule
                             "Host" => $ip,
                             "Port" => (int)$this->ReadPropertyInteger("Port"),
                             "UseCRLF" => (bool)$this->ReadPropertyBoolean("UseCRLF"),
-                            "USBMode" => "RECEIVER",
+                            "USBMode" => "CLIENT",
                             "RegistryInstanceID" => $regID,
                             "RegistryInstanceIDReceiver" => $regID,
                             "SourceName" => $web,

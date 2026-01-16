@@ -14,7 +14,7 @@ class JAPMaxColorUSBDevice extends IPSModule
         $this->RegisterPropertyInteger("Port", 23);
         $this->RegisterPropertyBoolean("UseCRLF", true);
 
-        $this->RegisterPropertyString("USBMode", "RECEIVER");
+        $this->RegisterPropertyString("USBMode", "CLIENT");
 
         // Sender-Eigenschaften
         $this->RegisterPropertyInteger("RegistryInstanceID", 0);
@@ -69,13 +69,13 @@ class JAPMaxColorUSBDevice extends IPSModule
 
         $mode = (string)$this->ReadPropertyString("USBMode");
 
-        if ($mode === "SENDER") {
+        if ($mode === "HOST") {
             if ($this->ReadPropertyBoolean("AutoAssignFromSchema")) {
                 $this->AutoAssignIfNeeded();
             }
         }
 
-        if ($mode === "RECEIVER") {
+        if ($mode === "CLIENT") {
             $this->RefreshSources();
         }
 
@@ -145,8 +145,8 @@ class JAPMaxColorUSBDevice extends IPSModule
     public function ApplyUSBChannel()
     {
         $mode = (string)$this->ReadPropertyString("USBMode");
-        if ($mode !== "SENDER") {
-            throw new Exception("ApplyUSBChannel nur im Sender-Modus verfügbar");
+        if ($mode !== "HOST") {
+            throw new Exception("ApplyUSBChannel nur im Host-Modus verfügbar");
         }
 
         $u = (int)$this->ReadPropertyInteger("USBChannel");
@@ -159,7 +159,7 @@ class JAPMaxColorUSBDevice extends IPSModule
     public function RefreshSources()
     {
         $mode = (string)$this->ReadPropertyString("USBMode");
-        if ($mode !== "RECEIVER") return;
+        if ($mode !== "CLIENT") return;
 
         $sources = $this->GetSourcesFromRegistry();
         $hash = md5(json_encode($sources));
