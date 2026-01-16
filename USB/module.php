@@ -146,14 +146,25 @@ class JAPMaxColorUSBDevice extends IPSModule
     {
         $mode = (string)$this->ReadPropertyString("USBMode");
         if ($mode !== "HOST") {
-            throw new Exception("ApplyUSBChannel nur im Host-Modus verfügbar");
+            echo "Diese Funktion ist nur im USB Host-Modus verfügbar.\n";
+            echo "Aktueller Modus: USB Client\n\n";
+            echo "Bitte ändern Sie den USB Modus auf 'USB Host (sendet USB)' um USB-Kanäle zu konfigurieren.";
+            return;
         }
 
         $u = (int)$this->ReadPropertyInteger("USBChannel");
 
+        if ($u <= 0) {
+            echo "Ungültiger USB-Kanal: " . $u . "\n";
+            echo "Bitte geben Sie einen gültigen USB-Kanal (1-9999) an.";
+            return;
+        }
+
         $this->WithLock(function () use ($u) {
             $this->SendCliCommand("channel -u " . $u);
         });
+
+        echo "USB-Kanal " . $u . " wurde erfolgreich angewendet.";
     }
 
     public function RefreshSources()
