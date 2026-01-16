@@ -128,10 +128,15 @@ class JAPMaxColorSourceRegistry extends IPSModule
     private function BuildSourcesFromEncoders()
     {
         $encoderModuleID = "{4E0C3C4A-0C7E-4A44-9B6B-5E1C6F4A2A20}";
-        $instances = IPS_GetInstanceListByModuleID($encoderModuleID);
+        $usbModuleID = "{8F2E4D5A-9C1B-4E2F-8A3D-1E5C7F9B2D40}";
+
+        $encoderInstances = IPS_GetInstanceListByModuleID($encoderModuleID);
+        $usbInstances = IPS_GetInstanceListByModuleID($usbModuleID);
 
         $sources = array();
-        foreach ($instances as $id) {
+
+        // Encoder-Instanzen
+        foreach ($encoderInstances as $id) {
             $sources[] = array(
                 "Name" => (string)IPS_GetProperty($id, "SourceName"),
                 "Video" => (int)IPS_GetProperty($id, "VideoChannel"),
@@ -139,6 +144,21 @@ class JAPMaxColorSourceRegistry extends IPSModule
                 "USB" => (int)IPS_GetProperty($id, "USBChannel"),
                 "EncoderInstanceID" => (int)$id
             );
+        }
+
+        // USB Host-Instanzen (nur im HOST-Modus)
+        foreach ($usbInstances as $id) {
+            $mode = (string)IPS_GetProperty($id, "USBMode");
+            if ($mode === "HOST") {
+                $sources[] = array(
+                    "Name" => (string)IPS_GetProperty($id, "SourceName"),
+                    "Video" => 0,
+                    "Audio" => 0,
+                    "USB" => (int)IPS_GetProperty($id, "USBChannel"),
+                    "EncoderInstanceID" => 0,
+                    "USBInstanceID" => (int)$id
+                );
+            }
         }
 
         usort($sources, function ($x, $y) {
