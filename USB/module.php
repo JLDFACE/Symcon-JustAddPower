@@ -102,12 +102,32 @@ class JAPMaxColorUSBDevice extends IPSModule
     public function RequestAction($Ident, $Value)
     {
         if ($Ident == "USBSource") {
+            $mode = (string)$this->ReadPropertyString("USBMode");
+            if ($mode !== "CLIENT") {
+                echo "USB-Quellenwahl ist nur im USB Client-Modus verfügbar.\n";
+                echo "Aktueller Modus: USB Host\n\n";
+                echo "Bitte ändern Sie den USB Modus auf 'USB Client (empfängt USB)' um Quellen zu wählen.";
+                return;
+            }
+
+            $regID = (int)$this->ReadPropertyInteger("RegistryInstanceIDReceiver");
+            if ($regID <= 0 || !IPS_InstanceExists($regID)) {
+                echo "Keine Registry-Instanz konfiguriert.\n";
+                echo "Bitte wählen Sie eine gültige Registry-Instanz in der Konfiguration.";
+                return;
+            }
+
             $idx = (int)$Value;
+            $name = $this->GetSourceNameByIndex($idx);
 
-            $this->WithLock(function () use ($idx) {
-                $name = $this->GetSourceNameByIndex($idx);
-                if ($name === "") throw new Exception("Invalid USBSource selection");
+            if ($name === "") {
+                echo "Ungültige USB-Quelle ausgewählt.\n";
+                echo "Index: " . $idx . "\n\n";
+                echo "Bitte aktualisieren Sie die Quellenliste in der Registry oder warten Sie auf die automatische Aktualisierung.";
+                return;
+            }
 
+            $this->WithLock(function () use ($name) {
                 $this->SwitchUSBBySourceName($name);
             });
 
@@ -183,12 +203,18 @@ class JAPMaxColorUSBDevice extends IPSModule
     private function SwitchUSBBySourceName($SourceName)
     {
         $src = $this->ResolveSource($SourceName);
-        if (!is_array($src)) throw new Exception("Source not found in registry: " . $SourceName);
+        if (!is_array($src)) {
+            echo "Quelle nicht in Registry gefunden: " . $SourceName . "\n";
+            echo "Bitte überprüfen Sie die Registry-Konfiguration.";
+            return;
+        }
 
-        $ch = (int)$src["USB"];
+        $ch = isset($src["USB"]) ? (int)$src["USB"] : 0;
 
         if ($ch <= 0) {
-            throw new Exception("Invalid USB channel: " . $ch);
+            echo "Ungültiger USB-Kanal für Quelle '" . $SourceName . "': " . $ch . "\n";
+            echo "Bitte konfigurieren Sie einen gültigen USB-Kanal in der Registry.";
+            return;
         }
 
         $this->SendCliCommand("channel -u " . $ch);
