@@ -24,7 +24,14 @@ class JAPMaxColorEncoderFlexible extends IPSModule
 
         $this->RegisterPropertyBoolean("AutoAssignFromSchema", true);
 
+        $this->RegisterVariableBoolean("Online", "Online", "~Alert.Reversed", 1);
+        IPS_SetIcon($this->GetIDForIdent("Online"), "Network");
+
         $this->RegisterVariableString("LastResponse", "Last Response", "", 90);
+
+        $this->RegisterAttributeBoolean("WasOnline", false);
+
+        $this->RegisterTimer("OnlineCheckTimer", 30000, 'JAPMC_CheckOnlineStatus($_IPS["TARGET"]);');
     }
 
     public function ApplyChanges()
@@ -60,6 +67,8 @@ class JAPMaxColorEncoderFlexible extends IPSModule
             $this->AutoAssignIfNeeded();
         }
 
+        $this->CheckOnlineStatus();
+
         $this->SetStatus(102);
     }
 
@@ -73,6 +82,32 @@ class JAPMaxColorEncoderFlexible extends IPSModule
             SetValueString($this->GetIDForIdent("LastResponse"), $buffer);
             $this->SendDebug("JAPMC ENC RX", $buffer, 0);
         }
+    }
+
+    public function CheckOnlineStatus()
+    {
+        $host = (string)$this->ReadPropertyString("Host");
+        $port = (int)$this->ReadPropertyInteger("Port");
+
+        $isOnline = $this->TestTcp($host, $port, 1000);
+        $wasOnline = (bool)$this->ReadAttributeBoolean("WasOnline");
+
+        SetValueBoolean($this->GetIDForIdent("Online"), $isOnline);
+
+        // Reconnect: War offline, ist jetzt online -> Parent-Verbindung öffnen
+        if (!$wasOnline && $isOnline) {
+            $this->SendDebug("JAPMC ENC Reconnect", "Device came online, reconnecting parent", 0);
+            $this->ReconnectParent();
+        }
+
+        // War online, ist jetzt offline -> Parent-Verbindung schließen
+        if ($wasOnline && !$isOnline) {
+            $this->SendDebug("JAPMC ENC Disconnect", "Device went offline, closing parent", 0);
+            $this->DisconnectParent();
+        }
+
+        $this->WriteAttributeBoolean("WasOnline", $isOnline);
+        $this->SendDebug("JAPMC ENC Online", $isOnline ? "true" : "false", 0);
     }
 
     public function ApplyChannels()
@@ -121,6 +156,32 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $data = array("DataID" => $this->TX, "Buffer" => $payload);
         $this->SendDataToParent(json_encode($data));
         $this->SendDebug("JAPMC ENC TX", $Command, 0);
+    }
+
+    private function ReconnectParent()
+    {
+        $inst = IPS_GetInstance($this->InstanceID);
+        $parentID = isset($inst["ConnectionID"]) ? (int)$inst["ConnectionID"] : 0;
+
+        if ($parentID > 0 && IPS_InstanceExists($parentID)) {
+            $this->CallSilenced(function () use ($parentID) {
+                IPS_SetProperty($parentID, "Open", true);
+                IPS_ApplyChanges($parentID);
+            });
+        }
+    }
+
+    private function DisconnectParent()
+    {
+        $inst = IPS_GetInstance($this->InstanceID);
+        $parentID = isset($inst["ConnectionID"]) ? (int)$inst["ConnectionID"] : 0;
+
+        if ($parentID > 0 && IPS_InstanceExists($parentID)) {
+            $this->CallSilenced(function () use ($parentID) {
+                IPS_SetProperty($parentID, "Open", false);
+                IPS_ApplyChanges($parentID);
+            });
+        }
     }
 
     private function WithLock($Callable)

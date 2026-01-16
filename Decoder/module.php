@@ -22,6 +22,9 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
         $this->RegisterPropertyString("Presets", "[]");
 
+        $this->RegisterVariableBoolean("Online", "Online", "~Alert.Reversed", 1);
+        IPS_SetIcon($this->GetIDForIdent("Online"), "Network");
+
         $this->RegisterVariableInteger("VideoSource", "Video Quelle", "", 10);
         $this->EnableAction("VideoSource");
 
@@ -47,8 +50,10 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $this->RegisterAttributeString("SelectedAudioName", "");
         $this->RegisterAttributeString("SelectedUSBName", "");
         $this->RegisterAttributeString("Initialized", "0");
+        $this->RegisterAttributeBoolean("WasOnline", false);
 
         $this->RegisterTimer("RefreshTimer", 60000, 'JAPMC_RefreshSources($_IPS["TARGET"]);');
+        $this->RegisterTimer("OnlineCheckTimer", 30000, 'JAPMC_CheckOnlineStatus($_IPS["TARGET"]);');
     }
 
     public function ApplyChanges()
@@ -84,6 +89,8 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         }
 
         $this->RefreshSources();
+        $this->CheckOnlineStatus();
+
         $this->SetStatus(102);
     }
 
@@ -186,6 +193,32 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         throw new Exception("Invalid Ident");
     }
 
+    public function CheckOnlineStatus()
+    {
+        $host = (string)$this->ReadPropertyString("Host");
+        $port = (int)$this->ReadPropertyInteger("Port");
+
+        $isOnline = $this->TestTcp($host, $port, 1000);
+        $wasOnline = (bool)$this->ReadAttributeBoolean("WasOnline");
+
+        SetValueBoolean($this->GetIDForIdent("Online"), $isOnline);
+
+        // Reconnect: War offline, ist jetzt online -> Parent-Verbindung öffnen
+        if (!$wasOnline && $isOnline) {
+            $this->SendDebug("JAPMC DEC Reconnect", "Device came online, reconnecting parent", 0);
+            $this->ReconnectParent();
+        }
+
+        // War online, ist jetzt offline -> Parent-Verbindung schließen
+        if ($wasOnline && !$isOnline) {
+            $this->SendDebug("JAPMC DEC Disconnect", "Device went offline, closing parent", 0);
+            $this->DisconnectParent();
+        }
+
+        $this->WriteAttributeBoolean("WasOnline", $isOnline);
+        $this->SendDebug("JAPMC DEC Online", $isOnline ? "true" : "false", 0);
+    }
+
     public function RefreshSources()
     {
         $sources = $this->GetSourcesFromRegistry();
@@ -205,6 +238,10 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         if ($Service == "v") $ch = (int)$src["Video"];
         if ($Service == "a") $ch = (int)$src["Audio"];
         if ($Service == "u") $ch = (int)$src["USB"];
+
+        if ($ch <= 0) {
+            throw new Exception("Invalid channel for service " . $Service . ": " . $ch);
+        }
 
         $this->SendCliCommand("channel -" . $Service . " " . $ch);
         $this->Delay();
@@ -278,6 +315,32 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $sources = $this->GetSourcesFromRegistry();
         if (!isset($sources[$Index])) return "";
         return isset($sources[$Index]["Name"]) ? (string)$sources[$Index]["Name"] : "";
+    }
+
+    private function ReconnectParent()
+    {
+        $inst = IPS_GetInstance($this->InstanceID);
+        $parentID = isset($inst["ConnectionID"]) ? (int)$inst["ConnectionID"] : 0;
+
+        if ($parentID > 0 && IPS_InstanceExists($parentID)) {
+            $this->CallSilenced(function () use ($parentID) {
+                IPS_SetProperty($parentID, "Open", true);
+                IPS_ApplyChanges($parentID);
+            });
+        }
+    }
+
+    private function DisconnectParent()
+    {
+        $inst = IPS_GetInstance($this->InstanceID);
+        $parentID = isset($inst["ConnectionID"]) ? (int)$inst["ConnectionID"] : 0;
+
+        if ($parentID > 0 && IPS_InstanceExists($parentID)) {
+            $this->CallSilenced(function () use ($parentID) {
+                IPS_SetProperty($parentID, "Open", false);
+                IPS_ApplyChanges($parentID);
+            });
+        }
     }
 
     private function WithLock($Callable)
