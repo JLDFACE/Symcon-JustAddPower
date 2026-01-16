@@ -79,8 +79,12 @@ class JAPMaxColorEncoderFlexible extends IPSModule
 
         $buffer = trim((string)$data["Buffer"]);
         if ($buffer !== "") {
-            SetValueString($this->GetIDForIdent("LastResponse"), $buffer);
             $this->SendDebug("JAPMC ENC RX", $buffer, 0);
+
+            // Shell-Prompts und leere Antworten ignorieren
+            if ($this->IsRelevantResponse($buffer)) {
+                SetValueString($this->GetIDForIdent("LastResponse"), $buffer);
+            }
         }
     }
 
@@ -156,6 +160,26 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $data = array("DataID" => $this->TX, "Buffer" => $payload);
         $this->SendDataToParent(json_encode($data));
         $this->SendDebug("JAPMC ENC TX", $Command, 0);
+    }
+
+    private function IsRelevantResponse($buffer)
+    {
+        // Shell-Prompts herausfiltern
+        if (preg_match('#^(/[a-zA-Z0-9/_-]+)\s*[#$>]\s*$#', $buffer)) {
+            return false;
+        }
+
+        // Nur Prompt-Zeichen (#, $, >) herausfiltern
+        if (preg_match('#^[#$>]\s*$#', $buffer)) {
+            return false;
+        }
+
+        // Leere Zeilen ignorieren
+        if ($buffer === "") {
+            return false;
+        }
+
+        return true;
     }
 
     private function ReconnectParent()

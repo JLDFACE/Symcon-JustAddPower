@@ -101,8 +101,12 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
         $buffer = trim((string)$data["Buffer"]);
         if ($buffer !== "") {
-            SetValueString($this->GetIDForIdent("LastResponse"), $buffer);
             $this->SendDebug("JAPMC DEC RX", $buffer, 0);
+
+            // Shell-Prompts und leere Antworten ignorieren
+            if ($this->IsRelevantResponse($buffer)) {
+                SetValueString($this->GetIDForIdent("LastResponse"), $buffer);
+            }
         }
     }
 
@@ -315,6 +319,26 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $sources = $this->GetSourcesFromRegistry();
         if (!isset($sources[$Index])) return "";
         return isset($sources[$Index]["Name"]) ? (string)$sources[$Index]["Name"] : "";
+    }
+
+    private function IsRelevantResponse($buffer)
+    {
+        // Shell-Prompts herausfiltern
+        if (preg_match('#^(/[a-zA-Z0-9/_-]+)\s*[#$>]\s*$#', $buffer)) {
+            return false;
+        }
+
+        // Nur Prompt-Zeichen (#, $, >) herausfiltern
+        if (preg_match('#^[#$>]\s*$#', $buffer)) {
+            return false;
+        }
+
+        // Leere Zeilen ignorieren
+        if ($buffer === "") {
+            return false;
+        }
+
+        return true;
     }
 
     private function ReconnectParent()
