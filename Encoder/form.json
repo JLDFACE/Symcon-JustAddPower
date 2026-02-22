@@ -54,6 +54,11 @@
       "type": "CheckBox",
       "name": "AutoAssignFromSchema",
       "caption": "Auto-Assign nach Schema (NextFree Index)"
+    },
+    {
+      "type": "CheckBox",
+      "name": "AutoApplyChannelsOnApply",
+      "caption": "Kanäle bei Apply/Reconnect automatisch auf Gerät setzen"
     }
   ],
   "actions": [

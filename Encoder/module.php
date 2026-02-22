@@ -23,6 +23,7 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $this->RegisterPropertyInteger("USBChannel", 0);
 
         $this->RegisterPropertyBoolean("AutoAssignFromSchema", true);
+        $this->RegisterPropertyBoolean("AutoApplyChannelsOnApply", true);
 
         $this->RegisterVariableBoolean("Online", "Online", "~Alert.Reversed", 1);
         IPS_SetIcon($this->GetIDForIdent("Online"), "Network");
@@ -30,6 +31,7 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $this->RegisterVariableString("LastResponse", "Last Response", "", 90);
 
         $this->RegisterAttributeBoolean("WasOnline", false);
+        $this->RegisterAttributeString("LastAppliedState", "");
 
         $this->RegisterTimer("OnlineCheckTimer", 30000, 'JAPMC_CheckOnlineStatus($_IPS["TARGET"]);');
     }
@@ -68,6 +70,7 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         }
 
         $this->CheckOnlineStatus();
+        $this->ApplyChannelsIfNeeded("ApplyChanges");
 
         $this->SetStatus(102);
     }
@@ -102,6 +105,7 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         if (!$wasOnline && $isOnline) {
             $this->SendDebug("JAPMC ENC Reconnect", "Device came online, reconnecting parent", 0);
             $this->ReconnectParent();
+            $this->ApplyChannelsIfNeeded("Reconnect", true);
         }
 
         // War online, ist jetzt offline -> Parent-Verbindung schließen
@@ -120,13 +124,13 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $a = (int)$this->ReadPropertyInteger("AudioChannel");
         $u = (int)$this->ReadPropertyInteger("USBChannel");
 
-        $this->WithLock(function () use ($v, $a, $u) {
-            $this->SendCliCommand("channel -v " . $v);
-            IPS_Sleep(100);
-            $this->SendCliCommand("channel -a " . $a);
-            IPS_Sleep(100);
-            $this->SendCliCommand("channel -u " . $u);
-        });
+        $this->ApplyChannelSet($v, $a, $u);
+
+        if ($v > 0 && $a > 0 && $u > 0) {
+            $host = (string)$this->ReadPropertyString("Host");
+            $port = (int)$this->ReadPropertyInteger("Port");
+            $this->WriteAttributeString("LastAppliedState", $this->BuildApplyState($host, $port, $v, $a, $u));
+        }
     }
 
     private function AutoAssignIfNeeded()
@@ -160,6 +164,55 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $data = array("DataID" => $this->TX, "Buffer" => $payload);
         $this->SendDataToParent(json_encode($data));
         $this->SendDebug("JAPMC ENC TX", $Command, 0);
+    }
+
+    private function ApplyChannelsIfNeeded($Reason, $Force = false)
+    {
+        if (!$this->ReadPropertyBoolean("AutoApplyChannelsOnApply")) {
+            return;
+        }
+
+        $v = (int)$this->ReadPropertyInteger("VideoChannel");
+        $a = (int)$this->ReadPropertyInteger("AudioChannel");
+        $u = (int)$this->ReadPropertyInteger("USBChannel");
+
+        if ($v <= 0 || $a <= 0 || $u <= 0) {
+            return;
+        }
+
+        $host = (string)$this->ReadPropertyString("Host");
+        $port = (int)$this->ReadPropertyInteger("Port");
+        $desiredState = $this->BuildApplyState($host, $port, $v, $a, $u);
+        $lastState = (string)$this->ReadAttributeString("LastAppliedState");
+
+        if (!$Force && $desiredState === $lastState) {
+            return;
+        }
+
+        if (!$this->TestTcp($host, $port, 300)) {
+            $this->SendDebug("JAPMC ENC Sync", "Skip " . $Reason . " (offline)", 0);
+            return;
+        }
+
+        $this->ApplyChannelSet($v, $a, $u);
+        $this->WriteAttributeString("LastAppliedState", $desiredState);
+        $this->SendDebug("JAPMC ENC Sync", "Applied by " . $Reason . ": " . $desiredState, 0);
+    }
+
+    private function ApplyChannelSet($Video, $Audio, $USB)
+    {
+        $this->WithLock(function () use ($Video, $Audio, $USB) {
+            $this->SendCliCommand("channel -v " . $Video);
+            IPS_Sleep(100);
+            $this->SendCliCommand("channel -a " . $Audio);
+            IPS_Sleep(100);
+            $this->SendCliCommand("channel -u " . $USB);
+        });
+    }
+
+    private function BuildApplyState($Host, $Port, $Video, $Audio, $USB)
+    {
+        return $Host . "|" . $Port . "|" . $Video . "|" . $Audio . "|" . $USB;
     }
 
     private function IsRelevantResponse($buffer)
