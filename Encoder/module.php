@@ -138,12 +138,43 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $u = (int)$this->ReadPropertyInteger("USBChannel");
 
         $this->ApplyChannelSet($v, $a, $u);
+        $this->UpdateLastAppliedStateFromProperties();
+    }
 
-        if ($v > 0 && $a > 0 && $u > 0) {
-            $host = (string)$this->ReadPropertyString("Host");
-            $port = (int)$this->ReadPropertyInteger("Port");
-            $this->WriteAttributeString("LastAppliedState", $this->BuildApplyState($host, $port, $v, $a, $u));
+    public function ApplyVideoChannel()
+    {
+        $v = (int)$this->ReadPropertyInteger("VideoChannel");
+        if ($v <= 0) {
+            echo "Ungültiger Video-Kanal: " . $v . "\n";
+            echo "Bitte einen gültigen Video-Kanal (> 0) setzen.";
+            return;
         }
+
+        $this->ApplySingleChannel("v", $v);
+    }
+
+    public function ApplyAudioChannel()
+    {
+        $a = (int)$this->ReadPropertyInteger("AudioChannel");
+        if ($a <= 0) {
+            echo "Ungültiger Audio-Kanal: " . $a . "\n";
+            echo "Bitte einen gültigen Audio-Kanal (> 0) setzen.";
+            return;
+        }
+
+        $this->ApplySingleChannel("a", $a);
+    }
+
+    public function ApplyUSBChannel()
+    {
+        $u = (int)$this->ReadPropertyInteger("USBChannel");
+        if ($u <= 0) {
+            echo "Ungültiger USB-Kanal: " . $u . "\n";
+            echo "Bitte einen gültigen USB-Kanal (> 0) setzen.";
+            return;
+        }
+
+        $this->ApplySingleChannel("u", $u);
     }
 
     private function AutoAssignIfNeeded()
@@ -221,6 +252,27 @@ class JAPMaxColorEncoderFlexible extends IPSModule
             IPS_Sleep(100);
             $this->SendCliCommand("channel -u " . $USB);
         });
+    }
+
+    private function ApplySingleChannel($Service, $Channel)
+    {
+        $this->WithLock(function () use ($Service, $Channel) {
+            $this->SendCliCommand("channel -" . $Service . " " . $Channel);
+        });
+        $this->UpdateLastAppliedStateFromProperties();
+    }
+
+    private function UpdateLastAppliedStateFromProperties()
+    {
+        $v = (int)$this->ReadPropertyInteger("VideoChannel");
+        $a = (int)$this->ReadPropertyInteger("AudioChannel");
+        $u = (int)$this->ReadPropertyInteger("USBChannel");
+
+        if ($v > 0 && $a > 0 && $u > 0) {
+            $host = (string)$this->ReadPropertyString("Host");
+            $port = (int)$this->ReadPropertyInteger("Port");
+            $this->WriteAttributeString("LastAppliedState", $this->BuildApplyState($host, $port, $v, $a, $u));
+        }
     }
 
     private function BuildApplyState($Host, $Port, $Video, $Audio, $USB)

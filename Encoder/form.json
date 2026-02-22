@@ -71,6 +71,21 @@
       "type": "Button",
       "caption": "Channels anwenden",
       "onClick": "JAPMC_ApplyChannels($id);"
+    },
+    {
+      "type": "Button",
+      "caption": "Nur Video anwenden",
+      "onClick": "JAPMC_ApplyVideoChannel($id);"
+    },
+    {
+      "type": "Button",
+      "caption": "Nur Audio anwenden",
+      "onClick": "JAPMC_ApplyAudioChannel($id);"
+    },
+    {
+      "type": "Button",
+      "caption": "Nur USB anwenden",
+      "onClick": "JAPMC_ApplyUSBChannel($id);"
     }
   ]
 }
