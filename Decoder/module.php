@@ -16,6 +16,7 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
         $this->RegisterPropertyInteger("RegistryInstanceID", 0);
         $this->RegisterPropertyInteger("CommandDelayMs", 100);
+        $this->RegisterPropertyBoolean("EnableUSBRouting", false);
 
         $this->RegisterPropertyBoolean("DefaultAudioFollowsVideo", true);
         $this->RegisterPropertyBoolean("DefaultUSBFollowsVideo", true);
@@ -56,6 +57,47 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $this->RegisterTimer("OnlineCheckTimer", 30000, 'JAPMC_CheckOnlineStatus($_IPS["TARGET"]);');
     }
 
+    public function GetConfigurationForm()
+    {
+        $form = json_decode(file_get_contents(__DIR__ . "/form.json"), true);
+        if (!is_array($form)) {
+            $form = array("elements" => array(), "actions" => array());
+        }
+
+        $usbEnabled = $this->IsUSBRoutingEnabled();
+
+        if (isset($form["elements"]) && is_array($form["elements"])) {
+            foreach ($form["elements"] as $k => $e) {
+                if (!isset($e["name"])) {
+                    continue;
+                }
+
+                if ($e["name"] === "DefaultUSBFollowsVideo") {
+                    $form["elements"][$k]["visible"] = $usbEnabled;
+                }
+
+                if ($e["name"] === "Presets" && isset($e["columns"]) && is_array($e["columns"])) {
+                    if ($usbEnabled) {
+                        continue;
+                    }
+
+                    $cols = array();
+                    foreach ($e["columns"] as $col) {
+                        $colName = isset($col["name"]) ? (string)$col["name"] : "";
+                        if ($colName === "USBSource") {
+                            continue;
+                        }
+                        $cols[] = $col;
+                    }
+                    $form["elements"][$k]["columns"] = $cols;
+                    $form["elements"][$k]["caption"] = "Presets (SourceNames; Audio leer => folgt Video)";
+                }
+            }
+        }
+
+        return json_encode($form);
+    }
+
     public function ApplyChanges()
     {
         parent::ApplyChanges();
@@ -82,12 +124,19 @@ class JAPMaxColorDecoderFlexible extends IPSModule
             });
         }
 
+        $usbEnabled = $this->IsUSBRoutingEnabled();
+
         if ($this->ReadAttributeString("Initialized") !== "1") {
             SetValueBoolean($this->GetIDForIdent("AudioFollowsVideo"), (bool)$this->ReadPropertyBoolean("DefaultAudioFollowsVideo"));
-            SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), (bool)$this->ReadPropertyBoolean("DefaultUSBFollowsVideo"));
+            SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), $usbEnabled ? (bool)$this->ReadPropertyBoolean("DefaultUSBFollowsVideo") : false);
             $this->WriteAttributeString("Initialized", "1");
         }
 
+        if (!$usbEnabled && GetValueBoolean($this->GetIDForIdent("USBFollowsVideo"))) {
+            SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), false);
+        }
+
+        $this->SetUSBVariableVisibility($usbEnabled);
         $this->RefreshSources();
         $this->CheckOnlineStatus();
 
@@ -140,7 +189,7 @@ class JAPMaxColorDecoderFlexible extends IPSModule
                     SetValueInteger($this->GetIDForIdent("AudioSource"), $idx);
                 }
 
-                if (GetValueBoolean($this->GetIDForIdent("USBFollowsVideo"))) {
+                if ($this->IsUSBRoutingEnabled() && GetValueBoolean($this->GetIDForIdent("USBFollowsVideo"))) {
                     $this->SwitchServiceBySourceName("u", $name);
                     $this->WriteAttributeString("SelectedUSBName", $name);
                     SetValueInteger($this->GetIDForIdent("USBSource"), $idx);
@@ -183,6 +232,12 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         }
 
         if ($Ident == "USBSource") {
+            if (!$this->IsUSBRoutingEnabled()) {
+                echo "USB-Routing ist deaktiviert.\n";
+                echo "Aktivieren Sie in der Konfiguration 'USB-Felder anzeigen'.";
+                return;
+            }
+
             $regID = (int)$this->ReadPropertyInteger("RegistryInstanceID");
             if ($regID <= 0 || !IPS_InstanceExists($regID)) {
                 echo "Keine Registry-Instanz konfiguriert.\n";
@@ -220,6 +275,11 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         }
 
         if ($Ident == "USBFollowsVideo") {
+            if (!$this->IsUSBRoutingEnabled()) {
+                SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), false);
+                return;
+            }
+
             $flag = (bool)$Value;
             SetValueBoolean($this->GetIDForIdent("USBFollowsVideo"), $flag);
             return;
@@ -442,6 +502,24 @@ class JAPMaxColorDecoderFlexible extends IPSModule
             } else {
                 restore_error_handler();
             }
+        }
+    }
+
+    private function IsUSBRoutingEnabled()
+    {
+        return (bool)$this->ReadPropertyBoolean("EnableUSBRouting");
+    }
+
+    private function SetUSBVariableVisibility($Enabled)
+    {
+        $usbSourceID = @$this->GetIDForIdent("USBSource");
+        if ((int)$usbSourceID > 0) {
+            IPS_SetHidden($usbSourceID, !$Enabled);
+        }
+
+        $usbFollowID = @$this->GetIDForIdent("USBFollowsVideo");
+        if ((int)$usbFollowID > 0) {
+            IPS_SetHidden($usbFollowID, !$Enabled);
         }
     }
 }

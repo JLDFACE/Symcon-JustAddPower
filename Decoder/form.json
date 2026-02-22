@@ -38,6 +38,11 @@
     },
     {
       "type": "CheckBox",
+      "name": "EnableUSBRouting",
+      "caption": "USB-Felder anzeigen (nur fuer Decoder mit USB-Endpunkt)"
+    },
+    {
+      "type": "CheckBox",
       "name": "DefaultUSBFollowsVideo",
       "caption": "Default: USB folgt Video"
     },

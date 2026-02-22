@@ -95,31 +95,60 @@ Dieses Schema wird zentral in der **Registry** verwaltet.
 
 ---
 
+## Channel ↔ Multicast IP (MaxColor)
+
+Im **Flexible/Advanced Mode** wird die Multicast-IP direkt aus dem Kanal abgeleitet:
+
+- Video: `239.92.xx.yy`
+- Audio: `239.93.xx.yy`
+- USB (MaxColor/MC-USB): `239.97.xx.yy`
+
+Dabei gilt:
+- `Kanal = xxyy` (00..99 / 00..99)
+- Beispiel: Kanal `1001` => `xx=10`, `yy=01`
+
+### Beispiele (MaxColor)
+| Dienst | Kanal | Multicast IP |
+|------|------:|------|
+| Video | 1000 | `239.92.10.00` |
+| Video | 1001 | `239.92.10.01` |
+| Audio | 2000 | `239.93.20.00` |
+| Audio | 2001 | `239.93.20.01` |
+| USB   | 3000 | `239.97.30.00` |
+| USB   | 3001 | `239.97.30.01` |
+
+Hinweis:
+- Geräte zeigen IPs oft ohne führende Nullen an (z. B. `239.97.30.1` statt `239.97.30.01`).
+- Wichtige Stolperfalle: `239.97.10.1` entspricht **Kanal 1001**, nicht 3001.
+
+---
+
 ## Voraussetzungen auf den Just Add Power Geräten
 
-### Zwingend erforderlich (Flexible Mode)
+### Zwingend erforderlich (Flexible Mode / Advanced)
 
 Auf **allen** MaxColor Geräten:
 
 ```
-switch_mode=multicast
-free_routing=y
-multicast_on=y
+channel mode advanced
+reboot
 ```
 
-Prüfen per Telnet:
+Danach kann pro Dienst geschaltet werden:
 ```
-astparam g switch_mode
-astparam g free_routing
-astparam g multicast_on
+channel -v <0-9999>
+channel -a <0-9999>
+channel -u <0-9999>
 ```
 
-Falls nötig setzen:
+Wichtig:
+- Alle beteiligten Geräte müssen im gleichen Mode laufen.
+- `channel mode advanced` zeigt die Default-Scopes für Video/Audio/USB an.
+- Die früher oft verwendeten `astparam ... switch_mode/free_routing/multicast_on` Kommandos sind auf neueren justOS/MAX-Ständen nicht verlässlich verfügbar.
+
+Firmware prüfen (CLI):
 ```
-astparam s switch_mode multicast
-astparam s free_routing y
-astparam s multicast_on y
-astparam save
+GET /details/device/firmware/version
 ```
 
 ---
@@ -172,6 +201,11 @@ Der Configurator liest diesen Namen automatisch aus.
 - Quellen auswählbar?
 - Audio/USB‑Follow‑Optionen prüfen
 
+### 7) MC-USB richtig zuordnen
+- MC-USB als **HOST**: stellt USB-Quelle bereit (SourceName + USBChannel, dann `USB Kanal anwenden`)
+- MC-USB als **CLIENT**: wählt eine Quelle aus der Registry (`USBSource`), setzt keinen festen USB-Kanal
+- Für MaxColor gilt bei USB immer Scope `239.97.x.x`
+
 ---
 
 ## Typische Fehlerbilder
@@ -185,6 +219,18 @@ Der Configurator liest diesen Namen automatisch aus.
 
 ### Geräte nicht im Scan
 → Nicht im Multicast Mode oder Telnet nicht erreichbar
+
+### Nach „Channels anwenden“ kein Signal
+→ Meist Kanal-/Scope-Mismatch zwischen Sollwert und Gerät
+
+Checkliste:
+- Sind alle Geräte auf `channel mode advanced`?
+- Stimmen Video/Audio/USB-Kanal wirklich mit der erwarteten Multicast-IP überein?
+- Beispiel: Für USB-Kanal `3001` muss die Zielgruppe `239.97.30.01` sein.
+- Falls nur ein Dienst geändert werden soll, im Encoder die separaten Buttons verwenden:
+  - `Nur Video anwenden`
+  - `Nur Audio anwenden`
+  - `Nur USB anwenden`
 
 ---
 
