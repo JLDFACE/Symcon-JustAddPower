@@ -23,7 +23,7 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $this->RegisterPropertyInteger("USBChannel", 0);
 
         $this->RegisterPropertyBoolean("AutoAssignFromSchema", true);
-        $this->RegisterPropertyBoolean("AutoApplyChannelsOnApply", true);
+        $this->RegisterPropertyBoolean("AutoApplyChannelsOnApply", false);
 
         $this->RegisterVariableBoolean("Online", "Online", "~Alert.Reversed", 1);
         IPS_SetIcon($this->GetIDForIdent("Online"), "Network");
@@ -32,6 +32,7 @@ class JAPMaxColorEncoderFlexible extends IPSModule
 
         $this->RegisterAttributeBoolean("WasOnline", false);
         $this->RegisterAttributeString("LastAppliedState", "");
+        $this->RegisterAttributeBoolean("AutoApplySafetyMigrated", false);
 
         $this->RegisterTimer("OnlineCheckTimer", 30000, 'JAPMC_CheckOnlineStatus($_IPS["TARGET"]);');
     }
@@ -39,6 +40,18 @@ class JAPMaxColorEncoderFlexible extends IPSModule
     public function ApplyChanges()
     {
         parent::ApplyChanges();
+
+        // Safety migration: previously auto-apply defaulted to true and could overwrite live channels.
+        // After this update we default to false and disable existing instances once.
+        if (!(bool)$this->ReadAttributeBoolean("AutoApplySafetyMigrated")) {
+            $this->WriteAttributeBoolean("AutoApplySafetyMigrated", true);
+            if ((bool)$this->ReadPropertyBoolean("AutoApplyChannelsOnApply")) {
+                IPS_SetProperty($this->InstanceID, "AutoApplyChannelsOnApply", false);
+                IPS_ApplyChanges($this->InstanceID);
+                $this->SendDebug("JAPMC ENC Safety", "AutoApplyChannelsOnApply disabled by migration", 0);
+                return;
+            }
+        }
 
         $host = (string)$this->ReadPropertyString("Host");
         $port = (int)$this->ReadPropertyInteger("Port");
@@ -105,7 +118,7 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         if (!$wasOnline && $isOnline) {
             $this->SendDebug("JAPMC ENC Reconnect", "Device came online, reconnecting parent", 0);
             $this->ReconnectParent();
-            $this->ApplyChannelsIfNeeded("Reconnect", true);
+            $this->ApplyChannelsIfNeeded("Reconnect");
         }
 
         // War online, ist jetzt offline -> Parent-Verbindung schließen
