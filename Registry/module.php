@@ -7,8 +7,8 @@ class JAPMaxColorSourceRegistry extends IPSModule
         parent::Create();
 
         $this->RegisterPropertyInteger("VideoBase", 1000);
-        $this->RegisterPropertyInteger("AudioBase", 2000);
-        $this->RegisterPropertyInteger("USBBase", 3000);
+        $this->RegisterPropertyInteger("AudioBase", 1000);
+        $this->RegisterPropertyInteger("USBBase", 1000);
         $this->RegisterPropertyInteger("BlockSize", 1000);
         $this->RegisterPropertyBoolean("AllowDuplicateChannels", false);
 

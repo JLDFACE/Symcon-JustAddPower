@@ -91,6 +91,11 @@
       "type": "Button",
       "caption": "Preset anwenden (aus Variable)",
       "onClick": "JAPMC_ApplySelectedPreset($id);"
+    },
+    {
+      "type": "Button",
+      "caption": "HDMI Ausgang prüfen",
+      "onClick": "JAPMC_CheckHDMIOutput($id);"
     }
   ]
 }

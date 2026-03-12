@@ -26,6 +26,9 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $this->RegisterVariableBoolean("Online", "Online", "~Alert.Reversed", 1);
         IPS_SetIcon($this->GetIDForIdent("Online"), "Network");
 
+        $this->RegisterVariableBoolean("HDMIOutput", "HDMI Ausgang", "~Alert.Reversed", 2);
+        IPS_SetIcon($this->GetIDForIdent("HDMIOutput"), "TV");
+
         $this->RegisterVariableInteger("VideoSource", "Video Quelle", "", 10);
         $this->EnableAction("VideoSource");
 
@@ -317,6 +320,12 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
         $this->WriteAttributeBoolean("WasOnline", $isOnline);
         $this->SendDebug("JAPMC DEC Online", $isOnline ? "true" : "false", 0);
+
+        if ($isOnline) {
+            $this->CheckHDMIOutput();
+        } else {
+            SetValueBoolean($this->GetIDForIdent("HDMIOutput"), false);
+        }
     }
 
     public function RefreshSources()
@@ -352,6 +361,67 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
         $this->SendCliCommand("channel -" . $Service . " " . $ch);
         $this->Delay();
+    }
+
+    public function CheckHDMIOutput()
+    {
+        $host = (string)$this->ReadPropertyString("Host");
+        $port = (int)$this->ReadPropertyInteger("Port");
+        $crlf = (bool)$this->ReadPropertyBoolean("UseCRLF");
+
+        $response = $this->TelnetExec($host, $port, 2000, 1500, $crlf, "astparam g hdmi_out_det");
+        $present  = $this->ParseAstparam($response, "hdmi_out_det");
+
+        SetValueBoolean($this->GetIDForIdent("HDMIOutput"), $present);
+        $this->SendDebug("JAPMC DEC HDMI", "Output=" . ($present ? "1" : "0") . " Raw=" . json_encode(trim($response)), 0);
+    }
+
+    private function ParseAstparam($Response, $Key)
+    {
+        $lines = preg_split('/\r?\n|\r/', (string)$Response);
+        foreach ($lines as $line) {
+            $t = trim($line);
+            if ($t === "") continue;
+
+            if (stripos($t, $Key . "=") !== false) {
+                $parts = explode("=", $t, 2);
+                $val   = trim($parts[1]);
+                return ($val === "1" || strtolower($val) === "true" || strtolower($val) === "yes");
+            }
+
+            if ($t === "1") return true;
+            if ($t === "0") return false;
+        }
+        return false;
+    }
+
+    private function TelnetExec($Host, $Port, $ConnectTimeoutMs, $ReadTimeoutMs, $UseCRLF, $Command)
+    {
+        $errno = 0; $errstr = "";
+        $timeoutSec = max(0.05, ((int)$ConnectTimeoutMs) / 1000.0);
+
+        $fp = @fsockopen($Host, $Port, $errno, $errstr, $timeoutSec);
+        if (!is_resource($fp)) return "";
+
+        stream_set_timeout($fp, 0, max(50000, ((int)$ReadTimeoutMs) * 1000));
+        @fread($fp, 2048);
+
+        $cmd = $Command . ($UseCRLF ? "\r\n" : "\n");
+        @fwrite($fp, $cmd);
+
+        $buf   = "";
+        $start = microtime(true);
+        $maxSec = max(0.05, ((int)$ReadTimeoutMs) / 1000.0);
+
+        while ((microtime(true) - $start) < $maxSec) {
+            $chunk = @fread($fp, 2048);
+            if ($chunk === false || $chunk === "") break;
+            $buf .= $chunk;
+            if (strlen($buf) > 8192) break;
+        }
+
+        fclose($fp);
+        return $buf;
     }
 
     private function SendCliCommand($Command)

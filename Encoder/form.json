@@ -86,6 +86,11 @@
       "type": "Button",
       "caption": "Nur USB anwenden",
       "onClick": "JAPMC_ApplyUSBChannel($id);"
+    },
+    {
+      "type": "Button",
+      "caption": "HDMI Signal prüfen",
+      "onClick": "JAPMC_CheckHDMISignal($id);"
     }
   ]
 }
