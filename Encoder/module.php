@@ -215,18 +215,28 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $port = (int)$this->ReadPropertyInteger("Port");
         $crlf = (bool)$this->ReadPropertyBoolean("UseCRLF");
 
+        // Parent kurz trennen – JAP-Geräte erlauben oft nur 1 Telnet-Session gleichzeitig
+        $this->DisconnectParent();
+        IPS_Sleep(300);
+
         $response = $this->TelnetExec($host, $port, 2000, 1500, $crlf, "astparam g hdmi_in_det");
         $present  = $this->ParseAstparam($response, "hdmi_in_det");
 
         SetValueBoolean($this->GetIDForIdent("HDMISignal"), $present);
-        $this->SendDebug("JAPMC ENC HDMI", "Signal=" . ($present ? "1" : "0") . " Raw=" . json_encode(trim($response)), 0);
+        $this->SendDebug("JAPMC ENC HDMI", "Signal=" . ($present ? "1" : "0") . " Raw=" . json_encode($response), 0);
+
+        // Parent wieder verbinden
+        $this->ReconnectParent();
     }
 
     private function ParseAstparam($Response, $Key)
     {
         $lines = preg_split('/\r?\n|\r/', (string)$Response);
         foreach ($lines as $line) {
-            $t = trim($line);
+            // ANSI-Escape-Codes und Steuerzeichen entfernen
+            $t = preg_replace('/\x1b(?:[@-Z\\\\-_]|\[[0-?]*[ -\/]*[@-~])/', '', $line);
+            $t = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $t);
+            $t = trim($t);
             if ($t === "") continue;
 
             if (stripos($t, $Key . "=") !== false) {
