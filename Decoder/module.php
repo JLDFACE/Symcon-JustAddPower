@@ -496,13 +496,13 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
     private function IsRelevantResponse($buffer)
     {
-        // Shell-Prompts herausfiltern
-        if (preg_match('#^(/[a-zA-Z0-9/_-]+)\s*[#$>]\s*$#', $buffer)) {
+        // Shell-Prompts herausfiltern (Delimiter ~ statt # wegen # im Zeichenset)
+        if (preg_match('~^(/[a-zA-Z0-9/_-]+)\s*[#$>]\s*$~', $buffer)) {
             return false;
         }
 
         // Nur Prompt-Zeichen (#, $, >) herausfiltern
-        if (preg_match('#^[#$>]\s*$#', $buffer)) {
+        if (preg_match('~^[#$>]\s*$~', $buffer)) {
             return false;
         }
 

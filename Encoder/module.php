@@ -219,8 +219,8 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $this->DisconnectParent();
         IPS_Sleep(300);
 
-        $response = $this->TelnetExec($host, $port, 2000, 1500, $crlf, "astparam g hdmi_in_det");
-        $present  = $this->ParseAstparam($response, "hdmi_in_det");
+        $response = $this->TelnetExec($host, $port, 2000, 2000, $crlf, "v4l2-ctl -d /dev/video0 --query-dv-timings 2>&1");
+        $present  = $this->ParseV4L2Signal($response);
 
         SetValueBoolean($this->GetIDForIdent("HDMISignal"), $present);
         $this->SendDebug("JAPMC ENC HDMI", "Signal=" . ($present ? "1" : "0") . " Raw=" . json_encode($response), 0);
@@ -247,6 +247,15 @@ class JAPMaxColorEncoderFlexible extends IPSModule
 
             if ($t === "1") return true;
             if ($t === "0") return false;
+        }
+        return false;
+    }
+
+    private function ParseV4L2Signal($Response)
+    {
+        // Signal vorhanden wenn "Active width: X" mit X > 0 in der Ausgabe
+        if (preg_match('/Active width:\s*([1-9]\d*)/', $Response)) {
+            return true;
         }
         return false;
     }
@@ -362,13 +371,13 @@ class JAPMaxColorEncoderFlexible extends IPSModule
 
     private function IsRelevantResponse($buffer)
     {
-        // Shell-Prompts herausfiltern
-        if (preg_match('#^(/[a-zA-Z0-9/_-]+)\s*[#$>]\s*$#', $buffer)) {
+        // Shell-Prompts herausfiltern (Delimiter ~ statt # wegen # im Zeichenset)
+        if (preg_match('~^(/[a-zA-Z0-9/_-]+)\s*[#$>]\s*$~', $buffer)) {
             return false;
         }
 
         // Nur Prompt-Zeichen (#, $, >) herausfiltern
-        if (preg_match('#^[#$>]\s*$#', $buffer)) {
+        if (preg_match('~^[#$>]\s*$~', $buffer)) {
             return false;
         }
 
