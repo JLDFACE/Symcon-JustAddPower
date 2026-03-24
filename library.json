@@ -5,5 +5,8 @@
   "url": "https://github.com/JLDFACE/Symcon-JustAddPower",
   "version": "1.0",
   "build": 1,
-  "date": 1767398400
+  "date": 1767398400,
+  "compatibility": {
+    "version": "7.0"
+  }
 }
