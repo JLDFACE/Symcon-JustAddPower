@@ -31,6 +31,9 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $this->RegisterVariableBoolean("HDMISignal", "HDMI Signal", "~Alert.Reversed", 2);
         IPS_SetIcon($this->GetIDForIdent("HDMISignal"), "TV");
 
+        $this->RegisterVariableString("Resolution", "Auflösung", "", 3);
+        IPS_SetIcon($this->GetIDForIdent("Resolution"), "Image");
+
         $this->RegisterVariableString("LastResponse", "Last Response", "", 90);
 
         $this->RegisterAttributeBoolean("WasOnline", false);
@@ -137,6 +140,7 @@ class JAPMaxColorEncoderFlexible extends IPSModule
             $this->CheckHDMISignal();
         } else {
             SetValueBoolean($this->GetIDForIdent("HDMISignal"), false);
+            SetValueString($this->GetIDForIdent("Resolution"), "");
         }
     }
 
@@ -219,11 +223,21 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $this->DisconnectParent();
         IPS_Sleep(300);
 
-        $response = $this->TelnetExec($host, $port, 2000, 2000, $crlf, "v4l2-ctl -d /dev/video0 --query-dv-timings 2>&1");
-        $present  = $this->ParseV4L2Signal($response);
+        // MaxColor (ASPEED VE) meldet den HDMI-Eingang über das videoip-Sysfs.
+        // v4l2-ctl existiert auf diesen Geräten nicht.
+        //   State == "OPERATING"  -> Signal gelockt
+        //   State == "DETECTING_MODE"/andere -> kein (nutzbares) Signal
+        //   timing_info -> Auflösung/Frequenz, wenn ein Signal anliegt
+        $response = $this->TelnetExec($host, $port, 2000, 2000, $crlf,
+            "cat /sys/devices/platform/videoip/State 2>/dev/null; echo '|'; cat /sys/devices/platform/videoip/timing_info 2>/dev/null");
+        $present  = $this->ParseVideoipSignal($response);
 
         SetValueBoolean($this->GetIDForIdent("HDMISignal"), $present);
-        $this->SendDebug("JAPMC ENC HDMI", "Signal=" . ($present ? "1" : "0") . " Raw=" . json_encode($response), 0);
+
+        $res = $present ? $this->ParseVideoipResolution($response) : "";
+        SetValueString($this->GetIDForIdent("Resolution"), $res);
+
+        $this->SendDebug("JAPMC ENC HDMI", "Signal=" . ($present ? "1" : "0") . " Res=" . $res . " Raw=" . json_encode($response), 0);
 
         // Parent wieder verbinden
         $this->ReconnectParent();
@@ -251,13 +265,23 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         return false;
     }
 
-    private function ParseV4L2Signal($Response)
+    private function ParseVideoipSignal($Response)
     {
-        // Signal vorhanden wenn "Active width: X" mit X > 0 in der Ausgabe
-        if (preg_match('/Active width:\s*([1-9]\d*)/', $Response)) {
+        // MaxColor: State == "OPERATING" bedeutet, der HDMI-Eingang ist gelockt.
+        // DETECTING_MODE (und andere) = kein nutzbares Signal.
+        if (preg_match('/\bOPERATING\b/', (string)$Response)) {
             return true;
         }
         return false;
+    }
+
+    private function ParseVideoipResolution($Response)
+    {
+        // timing_info-Beispiel: "... [3840]X[2160] [60]Hz Pixel Rate: 594000KHz ..."
+        if (preg_match('/\[(\d+)\]X\[(\d+)\]\s*\[(\d+)\]Hz/i', (string)$Response, $m)) {
+            return $m[1] . "x" . $m[2] . "@" . $m[3] . "Hz";
+        }
+        return "";
     }
 
     private function TelnetExec($Host, $Port, $ConnectTimeoutMs, $ReadTimeoutMs, $UseCRLF, $Command)
