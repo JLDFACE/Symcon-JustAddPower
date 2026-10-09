@@ -89,8 +89,11 @@ class JAPMaxColorUSBDevice extends IPSModule
         $data = json_decode($JSONString, true);
         if (!is_array($data) || !isset($data["Buffer"])) return;
 
-        // Telnet-Aushandlung (IAC DO/WILL …) entfernen, die das Gerät nach jedem Verbindungsaufbau schickt
-        $buffer = trim(preg_replace('~\xFF(?:[\xFB-\xFE].|[\xF0-\xFA])~s', "", (string)$data["Buffer"]));
+        // Telnet-Aushandlung (IAC DO/WILL …) entfernen, die das Gerät nach jedem Verbindungsaufbau schickt.
+        // Symcon liefert den Buffer UTF-8-kodiert, IAC (0xFF) kommt also als Codepoint U+00FF an.
+        $buffer = (string)$data["Buffer"];
+        $clean  = @preg_replace('~\x{FF}(?:[\x{FB}-\x{FE}].|[\x{F0}-\x{FA}])~su', "", $buffer);
+        $buffer = trim($clean === null ? $buffer : $clean);
         if ($buffer !== "") {
             $this->SendDebug("JAPMC USB RX", $buffer, 0);
 
