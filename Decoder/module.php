@@ -151,7 +151,8 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $data = json_decode($JSONString, true);
         if (!is_array($data) || !isset($data["Buffer"])) return;
 
-        $buffer = trim((string)$data["Buffer"]);
+        // Telnet-Aushandlung (IAC DO/WILL …) entfernen, die das Gerät nach jedem Verbindungsaufbau schickt
+        $buffer = trim(preg_replace('~\xFF(?:[\xFB-\xFE].|[\xF0-\xFA])~s', "", (string)$data["Buffer"]));
         if ($buffer !== "") {
             $this->SendDebug("JAPMC DEC RX", $buffer, 0);
 
@@ -369,30 +370,18 @@ class JAPMaxColorDecoderFlexible extends IPSModule
         $port = (int)$this->ReadPropertyInteger("Port");
         $crlf = (bool)$this->ReadPropertyBoolean("UseCRLF");
 
-        $response = $this->TelnetExec($host, $port, 2000, 1500, $crlf, "astparam g hdmi_out_det");
-        $present  = $this->ParseAstparam($response, "hdmi_out_det");
+        // MaxColor kennt kein astparam "hdmi_out_det"; den Hotplug-Zustand des
+        // angeschlossenen Displays meldet das Display-Sysfs ("Attached: y|n").
+        $response = $this->TelnetExec($host, $port, 2000, 1500, $crlf, "cat /sys/devices/platform/display/monitor_info");
+        $present  = $this->ParseMonitorAttached($response);
 
         SetValueBoolean($this->GetIDForIdent("HDMIOutput"), $present);
         $this->SendDebug("JAPMC DEC HDMI", "Output=" . ($present ? "1" : "0") . " Raw=" . json_encode(trim($response)), 0);
     }
 
-    private function ParseAstparam($Response, $Key)
+    private function ParseMonitorAttached($Response)
     {
-        $lines = preg_split('/\r?\n|\r/', (string)$Response);
-        foreach ($lines as $line) {
-            $t = trim($line);
-            if ($t === "") continue;
-
-            if (stripos($t, $Key . "=") !== false) {
-                $parts = explode("=", $t, 2);
-                $val   = trim($parts[1]);
-                return ($val === "1" || strtolower($val) === "true" || strtolower($val) === "yes");
-            }
-
-            if ($t === "1") return true;
-            if ($t === "0") return false;
-        }
-        return false;
+        return (bool)preg_match('~^\s*Attached:\s*y~mi', (string)$Response);
     }
 
     private function TelnetExec($Host, $Port, $ConnectTimeoutMs, $ReadTimeoutMs, $UseCRLF, $Command)

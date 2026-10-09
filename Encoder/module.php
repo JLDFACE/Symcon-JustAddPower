@@ -99,7 +99,8 @@ class JAPMaxColorEncoderFlexible extends IPSModule
         $data = json_decode($JSONString, true);
         if (!is_array($data) || !isset($data["Buffer"])) return;
 
-        $buffer = trim((string)$data["Buffer"]);
+        // Telnet-Aushandlung (IAC DO/WILL …) entfernen, die das Gerät nach jedem Verbindungsaufbau schickt
+        $buffer = trim(preg_replace('~\xFF(?:[\xFB-\xFE].|[\xF0-\xFA])~s', "", (string)$data["Buffer"]));
         if ($buffer !== "") {
             $this->SendDebug("JAPMC ENC RX", $buffer, 0);
 
