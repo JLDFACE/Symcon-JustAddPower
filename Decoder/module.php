@@ -384,7 +384,8 @@ class JAPMaxColorDecoderFlexible extends IPSModule
 
     private function ParseMonitorAttached($Response)
     {
-        return (bool)preg_match('~^\s*Attached:\s*y~mi', (string)$Response);
+        // MaxColor meldet "Attached: y", 3G "attached=y"
+        return (bool)preg_match('~^\s*attached\s*[:=]\s*y~mi', (string)$Response);
     }
 
     private function TelnetExec($Host, $Port, $ConnectTimeoutMs, $ReadTimeoutMs, $UseCRLF, $Command)

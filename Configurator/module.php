@@ -70,8 +70,8 @@ class JAPMaxColorConfigurator extends IPSModule
             $modelOut = $this->TelnetExec($ip, $port, $cTimeout, $rTimeout, $useCRLF, "getmodel.sh");
             $model = strtoupper(trim((string)$this->ParseSingleLineValue($modelOut, "getmodel.sh")));
 
-            // Filter: nur echte MaxColor
-            if ($model === "" || strpos($model, "MC-") !== 0) {
+            // Filter: MaxColor ("MC-…") und ältere 2G/3G-Geräte ("3G-S TX", "3G RX", …)
+            if ($model === "" || !preg_match('/^(MC-|[23]G\b)/', $model)) {
                 continue;
             }
 
@@ -213,9 +213,9 @@ class JAPMaxColorConfigurator extends IPSModule
         // USB-Geräte erkennen (MC-USB)
         if (preg_match('/\bMC-USB[A-Z0-9_-]*\b/', $t)) return "USB";
 
-        // Standard Decoder/Encoder
-        if (preg_match('/\bMC-[A-Z0-9_-]*RX[A-Z0-9_-]*\b/', $t)) return "DEC";
-        if (preg_match('/\bMC-[A-Z0-9_-]*TX[A-Z0-9_-]*\b/', $t)) return "ENC";
+        // Decoder/Encoder: MaxColor "MC-RX2"/"MC-TX2", 3G "3G RX"/"3G-S TX"
+        if (preg_match('/RX/', $t)) return "DEC";
+        if (preg_match('/TX/', $t)) return "ENC";
 
         return "UNKNOWN";
     }

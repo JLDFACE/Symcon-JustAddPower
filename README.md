@@ -40,7 +40,7 @@ Symcon-JustAddPower/
 
 ### 1) Configurator
 - Netzwerk‑Scan (Telnet)
-- Erkennung von MaxColor Geräten (`getmodel.sh`)
+- Erkennung von MaxColor Geräten (`getmodel.sh`), seit Build 4 auch ältere 2G/3G-Geräte (z. B. `3G-S TX`, `3G RX`)
 - Automatische Rollenbestimmung (ENC / DEC)
 - Auslesen des `webname` vom Gerät
 - Erstellen von Encoder‑ und Decoder‑Instanzen
